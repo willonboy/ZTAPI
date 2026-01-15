@@ -10,24 +10,9 @@ import Foundation
 import SwiftyJSON
 import ZTJSON
 @preconcurrency import Combine
-
-public extension Result {
-    @discardableResult
-    func onSuccess(_ code: (Success) -> Void) -> Self {
-        if case .success(let s) = self {
-            code(s)
-        }
-        return self
-    }
-
-    @discardableResult
-    func onFailure(_ code: (Failure) -> Void) -> Self {
-        if case .failure(let f) = self {
-            code(f)
-        }
-        return self
-    }
-}
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
 
 /// 字典泛型取值函数，支持类型安全的值提取
 extension Dictionary {
@@ -145,7 +130,10 @@ struct ZTURLEncoding: ZTParameterEncoding {
     }
 
     private func query(_ items: [URLQueryItem]) -> String {
-        items.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+        // 利用 URLComponents 的自动编码功能
+        var components = URLComponents()
+        components.queryItems = items
+        return components.percentEncodedQuery ?? ""
     }
 }
 
@@ -153,7 +141,16 @@ struct ZTURLEncoding: ZTParameterEncoding {
 struct ZTJSONEncoding: ZTParameterEncoding {
     func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: params)
+
+        // 预先验证对象是否可 JSON 序列化
+        // 注意：isValidJSONObject 只能检测字典顶层的键值对，无法检测嵌套的不可序列化对象
+        // 对于嵌套对象，JSONSerialization 可能会抛出 NSException（Swift 无法捕获）
+        // 这是 Swift 与 Foundation 互操作的固有限制
+        if JSONSerialization.isValidJSONObject(params) {
+            request.httpBody = try JSONSerialization.data(withJSONObject: params)
+        } else {
+            throw ZTAPIError(-1, "Params contain non-JSON-serializable objects")
+        }
     }
 }
 
@@ -236,25 +233,16 @@ struct ZTMimeType: Sendable, Hashable {
     static let xmlText = xml
 
     /// 根据文件扩展名获取 MIME 类型
+    /// 使用系统的 UTType API 自动识别（iOS 14+ / macOS 11+ / tvOS 14+）
     static func fromFileExtension(_ ext: String) -> ZTMimeType {
-        switch ext.lowercased() {
-        case "jpg", "jpeg": return .jpeg
-        case "png": return .png
-        case "gif": return .gif
-        case "webp": return .webp
-        case "svg": return .svg
-        case "mp4": return .mp4
-        case "mp3": return .mp3
-        case "pdf": return .pdf
-        case "txt": return .txt
-        case "html", "htm": return .html
-        case "css": return .css
-        case "js": return .javascript
-        case "json": return .json
-        case "xml": return .xml
-        case "zip": return .zip
-        default: return .octetStream
+        if #available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *) {
+            if let uttype = UTType(filenameExtension: ext),
+               let mimeType = uttype.preferredMIMEType {
+                return ZTMimeType(mimeType)
+            }
         }
+        // 降级处理：未知扩展名返回 octet-stream
+        return .octetStream
     }
 
     /// 根据文件 URL 获取 MIME 类型
@@ -281,7 +269,7 @@ struct ZTMultipartFormData: Sendable {
     }
 
     /// 构建完整的请求数据
-    func build() -> Data {
+    func build() throws -> Data {
         var body = Data()
         let line = "\r\n"
         let boundaryLine = "--\(boundary)\r\n"
@@ -304,7 +292,7 @@ struct ZTMultipartFormData: Sendable {
             }
 
             body.append(line.data(using: .utf8)!)
-            body.append(part.provider.data)
+            body.append(try part.provider.getData())  // 调用 getData() 可能抛出错误
             body.append(line.data(using: .utf8)!)
         }
 
@@ -322,7 +310,8 @@ enum ZTMultipartDataProvider: Sendable {
     /// 文件 URL（支持内存映射读取）
     case file(URL, mapIfSupported: Bool = true)
 
-    var data: Data {
+    /// 获取数据，文件读取失败时会抛出错误
+    func getData() throws -> Data {
         switch self {
         case .data(let data):
             return data
@@ -330,12 +319,20 @@ enum ZTMultipartDataProvider: Sendable {
             // 读取文件数据
             // 如果支持内存映射，优先使用（iOS/tvOS/watchOS）
             #if !os(OSX)
-            if mapIfSupported, let mappedData = try? Data(contentsOf: url, options: .alwaysMapped) {
-                return mappedData
+            if mapIfSupported {
+                do {
+                    return try Data(contentsOf: url, options: .alwaysMapped)
+                } catch {
+                    // 内存映射失败，尝试普通读取
+                }
             }
             #endif
             // 回退到普通读取
-            return (try? Data(contentsOf: url)) ?? Data()
+            do {
+                return try Data(contentsOf: url)
+            } catch {
+                throw ZTAPIError(-2, "Failed to read file at \(url.path): \(error.localizedDescription)")
+            }
         }
     }
 }
@@ -393,7 +390,7 @@ struct ZTMultipartEncoding: ZTParameterEncoding {
         // 所有数据应该通过 MultipartFormData 的 parts 传入
         let boundary = formData.boundary
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = formData.build()
+        request.httpBody = try formData.build()  // 可能抛出文件读取错误
     }
 }
 
@@ -418,6 +415,40 @@ struct ZTAPIParseConfig: Hashable {
     }
 }
 
+// MARK: - Upload Progress
+
+/// 上传进度信息
+struct ZTUploadProgress: Sendable {
+    /// 已写入/上传的字节数
+    let bytesWritten: Int64
+    /// 总字节数（-1 表示未知，例如 chunked 编码）
+    let totalBytes: Int64
+
+    /// 计算进度百分比（0.0 - 1.0）
+    var fractionCompleted: Double {
+        if totalBytes > 0 {
+            return Double(bytesWritten) / Double(totalBytes)
+        }
+        return 0
+    }
+
+    /// 已上传字节的可读格式
+    var bytesWrittenFormatted: String {
+        ByteCountFormatter.string(fromByteCount: bytesWritten, countStyle: .file)
+    }
+
+    /// 总字节的可读格式
+    var totalBytesFormatted: String {
+        if totalBytes > 0 {
+            return ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+        }
+        return "Unknown"
+    }
+}
+
+/// 上传进度回调类型
+typealias ZTUploadProgressHandler = @Sendable (ZTUploadProgress) -> Void
+
 /// HTTP 方法
 enum ZTHTTPMethod: String {
     case get = "GET"
@@ -440,6 +471,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     private let provider: any ZTAPIProvider
     private var requestTimeout: TimeInterval?
     private var requestRetryPolicy: (any ZTAPIRetryPolicy)?
+    private var uploadProgressHandler: ZTUploadProgressHandler?
 
     init(_ url: String, _ method: ZTHTTPMethod, provider: (any ZTAPIProvider)? = nil) {
         self.urlStr = url
@@ -545,6 +577,12 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         return self
     }
 
+    /// 设置上传进度回调
+    func uploadProgress(_ handler: @escaping ZTUploadProgressHandler) -> Self {
+        uploadProgressHandler = handler
+        return self
+    }
+
     // MARK: - Send
 
     /// 发送请求并返回解析后的响应
@@ -565,11 +603,11 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
-        try encoding.encode(&urlRequest, with: params)
-
-        // 如果设置了 bodyData，覆盖请求体
+        // bodyData 优先级高于 encoding：如果设置了 bodyData，跳过参数编码
         if let body = bodyData {
             urlRequest.httpBody = body
+        } else {
+            try encoding.encode(&urlRequest, with: params)
         }
 
         // 应用超时时间到 URLRequest
@@ -583,8 +621,12 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             policy: requestRetryPolicy
         )
 
-        // 通过 provider 发送请求
-        let data = try await effectiveProvider.request(urlRequest, timeout: requestTimeout)
+        // 通过 provider 发送请求（传递进度回调）
+        let data = try await effectiveProvider.request(
+            urlRequest,
+            timeout: requestTimeout,
+            uploadProgress: uploadProgressHandler
+        )
 
         // 解析 JSON
         let json = JSON(data)
@@ -606,25 +648,52 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         return res
     }
 
-    /// 用于在跨并发域传递非 Sendable 值的包装器
-    private struct UnsafeTransfer<T>: @unchecked Sendable {
+    /// 用于安全地在跨并发域传递 Future.Promise 的包装器
+    /// Future.Promise 实际上是线程安全的（Combine 内部处理同步），
+    /// 但 Swift 6 类型系统无法识别这一点，需要使用 @unchecked Sendable
+    private struct PromiseTransfer<T>: @unchecked Sendable {
         let value: T
     }
 
     /// 发送请求并返回 Publisher
+    /// 使用 Deferred 延迟 Future 创建，确保只在订阅时才执行请求
+    /// 使用 MainActor.run 确保 promise 在主线程上被调用
+    /// 避免从后台线程直接调用 Combine Future.Promise 导致的 executor 断言失败
+    /// 使用 share() 确保多订阅时只执行一次请求，结果共享给所有订阅者
     var publisher: AnyPublisher<APIResponse, Error> {
-        Future { promise in
-            let unsafePromise = UnsafeTransfer(value: promise)
-            Task {
-                do {
-                    let result = try await self.send()
-                    unsafePromise.value(.success(result))
-                } catch {
-                    unsafePromise.value(.failure(error))
+        Deferred {
+            Future { promise in
+                let promiseTransfer = PromiseTransfer(value: promise)
+                Task {
+                    do {
+                        let result = try await self.send()
+                        // 仅在回调 promise 时切回主线程
+                        // 这里的操作是安全的：result 在 MainActor.run 内同步使用，无并发风险
+                        await MainActor.run {
+                            promiseTransfer.value(.success(result))
+                        }
+                    } catch {
+                        await MainActor.run {
+                            promiseTransfer.value(.failure(error))
+                        }
+                    }
                 }
             }
         }
+        .share()
         .eraseToAnyPublisher()
+    }
+
+    // MARK: - Global Provider Convenience
+
+    /// 使用全局 Provider 创建 API 实例
+    /// 全局 Provider 自动控制并发数（默认最多 6 个）
+    /// - Parameters:
+    ///   - url: 请求地址
+    ///   - method: 请求方法
+    /// - Returns: 使用全局 Provider 的 ZTAPI 实例
+    static func global(_ url: String, _ method: ZTHTTPMethod = .get) -> ZTAPI<P> {
+        ZTAPI(url, method, provider: ZTGlobalAPIProvider.shared.provider)
     }
 
 #if DEBUG
