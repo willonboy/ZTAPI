@@ -481,8 +481,31 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
 
     // MARK: - Types
 
-    /// API 响应类型别名
-    typealias APIResponse = [String: any ZTJSONInitializable]
+    /// API 响应类型 - 使用 @unchecked Sendable 包装以支持 Swift 6 并发
+    struct APIResponse: @unchecked Sendable {
+        private let value: [String: any ZTJSONInitializable]
+
+        init(_ value: [String: any ZTJSONInitializable]) {
+            self.value = value
+        }
+
+        /// 通过下标获取值
+        subscript(key: String) -> (any ZTJSONInitializable)? {
+            value[key]
+        }
+
+        /// 泛型取值方法，支持类型安全的值提取
+        func get<T: ZTJSONInitializable>(_ key: String) -> T? {
+            guard let v = value[key] else { return nil }
+            return v as? T
+        }
+
+        /// 响应中解析项的数量
+        var count: Int { value.count }
+
+        /// 响应是否为空
+        var isEmpty: Bool { value.isEmpty }
+    }
 
     /// 添加数据解析配置
     func parse(_ configs: ZTAPIParseConfig...) -> Self {
@@ -630,7 +653,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
 
         // 解析 JSON
         let json = JSON(data)
-        var res: APIResponse = [:]
+        var res: [String: any ZTJSONInitializable] = [:]
 
         for config in parseConfigs {
             if let js = json.find(xpath: config.xpath) {
@@ -645,7 +668,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             }
         }
 
-        return res
+        return APIResponse(res)
     }
 
     /// 用于安全地在跨并发域传递 Future.Promise 的包装器
