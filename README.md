@@ -25,11 +25,8 @@ https://github.com/willonboy/ZTAPI.git
 ### CocoaPods
 
 ```ruby
-# 已发布到 CocoaPods
-pod 'ZTAPI', '~> 1.0.0'
-
 # 或从 Git 安装（开发版）
-pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :tag => '1.0.0'
+pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 ```
 
 ## 核心用法
