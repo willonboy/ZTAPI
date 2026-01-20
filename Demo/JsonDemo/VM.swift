@@ -129,6 +129,14 @@ enum UserCenterAPI {
         ])
     }
 
+#if canImport(ZTJSON)
+    @ZTAPIParam
+    enum UserAPIParam {
+        case userName(String)
+        case password(String)
+        case userId(String)
+    }
+#else
     enum UserAPIParam: ZTAPIParamProtocol {
         case userName(String)
         case password(String)
@@ -154,6 +162,8 @@ enum UserCenterAPI {
             return true
         }
     }
+#endif
+    
 
     private static func makeApi<P: ZTAPIParamProtocol>(_ url: String, _ method: ZTHTTPMethod) -> ZTAPI<P> {
         ZTAPI<P>(url, method, provider: provider)
@@ -232,11 +242,8 @@ class VM {
         // 示例1: 上传单个图片 Data
         do {
             let imageData = Data("fake image data".utf8)
-            let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg)
-            ]
             let data: Data = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
-                .upload(items)
+                .upload(.data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg))
                 .send()
             print("✅ 上传单个 Data 成功，响应: \(data.count) bytes")
         } catch {
@@ -247,12 +254,8 @@ class VM {
         do {
             let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("upload.txt")
             try "test file content".write(to: fileURL, atomically: true, encoding: .utf8)
-
-            let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .file(fileURL, name: "file", mimeType: .txt)
-            ]
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
-                .upload(items)
+                .upload(.file(fileURL, name: "file", mimeType: .txt))
                 .send()
             print("✅ 上传单个文件成功")
         } catch {
@@ -266,14 +269,10 @@ class VM {
             try "fake image 1".write(to: fileURL1, atomically: true, encoding: .utf8)
             try "fake image 2".write(to: fileURL2, atomically: true, encoding: .utf8)
 
-            let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .data(Data("metadata".utf8), name: "metadata", mimeType: .json),
-                .file(fileURL1, name: "photos", mimeType: .jpeg),
-                .file(fileURL2, name: "photos", mimeType: .jpeg)
-            ]
-
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multiple", .post, provider: ZTAlamofireProvider.shared)
-                .upload(items)
+                .upload(.data(Data("metadata".utf8), name: "metadata", mimeType: .json),
+                        .file(fileURL1, name: "photos", mimeType: .jpeg),
+                        .file(fileURL2, name: "photos", mimeType: .jpeg))
                 .send()
             print("✅ 上传多个项成功（Data + File 混合）")
         } catch {
@@ -308,11 +307,8 @@ class VM {
 
         // 示例6: 使用自定义 MIME 类型
         do {
-            let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .data(Data("custom data".utf8), name: "file", mimeType: .custom(ext:"", mime: "application/vnd.example"))
-            ]
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
-                .upload(items)
+                .upload(.data(Data("custom data".utf8), name: "file", mimeType: .custom(ext:"", mime: "application/vnd.example")))
                 .send()
             print("✅ 使用自定义 MIME 类型成功")
         } catch {

@@ -501,7 +501,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     }
 
     /// 上传多个项（支持混合 Data 和 File）
-    func upload(_ items: [ZTUploadItem]) -> Self {
+    func upload(_ items: ZTUploadItem...) -> Self {
         let parts = items.map { $0.bodyPart }
         return multipart(ZTMultipartFormData(parts: parts))
     }

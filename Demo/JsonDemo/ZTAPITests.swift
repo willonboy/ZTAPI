@@ -650,13 +650,9 @@ class ZTAPITests {
                 )
             ])
 
-            let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .data(Data("file content".utf8), name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg),
-                .data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json)
-            ]
-
             let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: stubProvider)
-                .upload(items)
+                .upload(.data(Data("file content".utf8), name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg),
+                        .data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
 
             assertEqual(api.params.count, 0)
             assertTrue(api.bodyData == nil, "bodyData 应被 multipart 清除")
