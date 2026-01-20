@@ -6,9 +6,6 @@
 //
 
 import UIKit
-import ZTJSON
-import SwiftyJSON
-
 
 class ViewController: UIViewController {
 

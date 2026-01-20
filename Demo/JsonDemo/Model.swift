@@ -5,9 +5,11 @@
 //  Created by zt on 2025/3/29.
 //
 
-import ZTJSON
-import SwiftyJSON
 import Foundation
+
+#if canImport(ZTJSON)
+import SwiftyJSON
+import ZTJSON
 
 let js = """
 [
@@ -299,7 +301,7 @@ class BaseAddress {
 
 
 @ZTJSONSubclass
-class Address: BaseAddress {
+class Address: BaseAddress, @unchecked Sendable {
     var zipcode: String = ""
     
     @ZTJSONTransformer(TransformDouble.self)
@@ -358,7 +360,7 @@ extension Geo: Swift.CustomStringConvertible, Swift.CustomDebugStringConvertible
 
 
 @ZTJSON
-class User {
+struct User: Sendable {
     @ZTJSONLetDefValue(0)
     let id: Int
     @ZTJSONLetDefValue("")
@@ -440,4 +442,5 @@ extension NestAddress: Swift.CustomStringConvertible, Swift.CustomDebugStringCon
         return description
     }
 }
+#endif
 

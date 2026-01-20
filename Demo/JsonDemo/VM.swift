@@ -2,20 +2,105 @@
 //  VM.swift
 //  JsonDemo
 //
-//  Created by zt on 2025/3/29.
+//  Created by zt on 2026/1/13.
 //
 
 import Foundation
+#if canImport(ZTJSON)
 import SwiftyJSON
 import ZTJSON
+#endif
 
+
+#if !canImport(ZTJSON)
+// MARK: - Models
+//
+/// 用户模型
+struct User: Codable, Sendable {
+    let id: Int
+    let name: String
+    let username: String?
+    let email: String?
+    let phone: String?
+    let website: String?
+    let address: Address?
+    let company: Company?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, username, email, phone, website, address, company
+    }
+}
+
+/// 地址模型
+struct Address: Codable, Sendable {
+    let street: String
+    let suite: String
+    let city: String
+    let zipcode: String
+    let geo: Geo?
+
+    private enum CodingKeys: String, CodingKey {
+        case street, suite, city, zipcode, geo
+    }
+}
+
+/// 地理位置模型
+struct Geo: Codable, Sendable {
+    let lat: String
+    let lng: String
+}
+
+/// 公司模型
+struct Company: Codable, Sendable {
+    let name: String
+    let catchPhrase: String?
+    let bs: String?
+}
+#endif
+
+/// 登录响应
+struct LoginResponse: Codable, Sendable {
+    struct Data: Codable, Sendable {
+        let token: String
+    }
+    let code: Int
+    let data: Data?
+    let msg: String?
+}
+
+/// 用户信息响应
+struct UserInfoResponse: Codable, Sendable {
+    struct Data: Codable, Sendable {
+        let token: String
+        let username: String
+        let email: String
+        let userId: String
+    }
+    let code: Int
+    let data: Data?
+    let msg: String?
+}
+
+/// 用户列表响应（标准 API 响应格式）
+struct UserListResponse: Codable {
+    let code: Int
+    let data: [User]?
+    let msg: String?
+}
+
+// MARK: - API Headers
 
 @MainActor
 extension ZTAPIHeader {
-    static var contentType:ZTAPIHeader = .h(key: "Content-Type", value: "application/json")
-    static var auth:ZTAPIHeader = .h(key: "Authorization", value: "Bearer token")
+    static var contentType: ZTAPIHeader {
+        .h(key: "Content-Type", value: "application/json")
+    }
+    static var auth: ZTAPIHeader {
+        .h(key: "Authorization", value: "Bearer token")
+    }
 }
 
+// MARK: - API
 
 @MainActor
 enum UserCenterAPI {
@@ -27,135 +112,122 @@ enum UserCenterAPI {
         baseUrl + path
     }
 
-    /// 配置 Provider（可注入 plugins）
+    /// 配置 Provider
     static var provider: any ZTAPIProvider {
-        // 可在此切换 Provider 实现
-        // ZTAlamofireProvider - 基于 Alamofire（功能更丰富）
-        // ZTURLSessionProvider - 基于 URLSession（系统原生，无额外依赖）
-        return urlSessionProvider
+        ZTURLSessionProvider()
     }
 
-    /// 基于 URLSession 的 Provider（系统原生实现）
-    static var urlSessionProvider: any ZTAPIProvider {
-        ZTURLSessionProvider(plugins: [
-            ZTLogPlugin(level: .simple)
-        ])
-    }
-
-    /// 基于 Alamofire 的 Provider（需要 Alamofire 依赖）
-    static var alamofireProvider: any ZTAPIProvider {
-        ZTAlamofireProvider(plugins: [
-            ZTLogPlugin(level: .simple)
-        ])
-    }
-
-    /// 测试用 Provider
     static var stubProvider: any ZTAPIProvider {
         ZTStubProvider.jsonStubs([
             "GET:https://jsonplaceholder.typicode.com/users": [
+                "code": 0,
                 "data": [
-                    ["id": 1, "name": "Test User"],
-                    ["id": 2, "name": "Demo User"]
+                    ["id": 1, "name": "Leanne Graham", "username": "Bret", "email": "sincere@april.biz"],
+                    ["id": 2, "name": "Ervin Howell", "username": "Antonette", "email": "shanna@melissa.tv"]
                 ]
             ]
         ])
     }
 
-    static var commonHeaders: [ZTAPIHeader] {
-        [.contentType, .auth]
-    }
-
-    @ZTAPIParam
-    enum UserAPIParam {
+    enum UserAPIParam: ZTAPIParamProtocol {
         case userName(String)
         case password(String)
         case userId(String)
+
+        var key: String {
+            switch self {
+            case .userName: return "user_name"
+            case .password: return "password"
+            case .userId: return "user_id"
+            }
+        }
+
+        var value: Sendable {
+            switch self {
+            case .userName(let v): return v
+            case .password(let v): return v
+            case .userId(let v): return v
+            }
+        }
+
+        static func isValid(_ params: [String: Sendable]) -> Bool {
+            return true
+        }
     }
 
     private static func makeApi<P: ZTAPIParamProtocol>(_ url: String, _ method: ZTHTTPMethod) -> ZTAPI<P> {
-        ZTAPI<P>(url, method, provider: provider).headers(commonHeaders)
+        ZTAPI<P>(url, method, provider: provider)
     }
 
-    private static func makeApiGet<P: ZTAPIParamProtocol>(_ url: String) -> ZTAPI<P> {
-        makeApi(url, .get).encoding(ZTURLEncoding())
+    /// 登录
+    static func login(userName: String, password: String) -> ZTAPI<UserAPIParam> {
+        makeApi(fullPath("/user/login"), .post)
+            .params(.userName(userName))
+            .params(.password(password))
     }
 
-    private static func makeApiPost<P: ZTAPIParamProtocol>(_ url: String) -> ZTAPI<P> {
-        makeApi(url, .post).encoding(ZTJSONEncoding())
+    /// 获取用户信息
+    static func userInfo(userId: String) -> ZTAPI<UserAPIParam> {
+        makeApi(fullPath("/user/info"), .get)
+            .params(.userId(userId))
     }
 
-    static func login(userName: String, password: String) -> ZTAPI<ZTAPIKVParam> {
-        return makeApiPost(fullPath("/user/login"))
-            .param(.kv("user_name", userName))
-            .param(.kv("password", password))
-            .parse(
-                .init("data/token", type: String.self, false)
-            )
-    }
-
-    static func login2(userName: String, password: String) -> ZTAPI<UserAPIParam> {
-        return makeApiPost(fullPath("/user/login"))
-            .param(.userName(userName))
-            .param(.password(password))
-            .parse(
-                .init("data/token", type: String.self, false)
-            )
-    }
-
-    static func userInfo(userId: String) -> ZTAPI<ZTAPIKVParam> {
-        return makeApiGet(fullPath("/user/info"))
-            .param(.kv("user_id", userId))
-            .parse(
-                .init("data/token", type: String.self, false),
-                .init("data/username", type: String.self),
-                .init("data/email", type: String.self)
-            )
-    }
-
+    /// 获取用户列表
     static var userList: ZTAPI<ZTAPIKVParam> {
-        makeApiGet(fullPath("/users"))
+        makeApi(fullPath("/users"), .get)
+    }
+
+    /// 获取单个用户
+    static func user(id: Int) -> ZTAPI<ZTAPIKVParam> {
+        makeApi(fullPath("/users/\(id)"), .get)
     }
 }
 
-/// ViewModel - 封装用户中心相关的 API 调用和业务逻辑
+// MARK: - ViewModel
+
 @MainActor
 class VM {
     var token: String = ""
-    var userList: [User]? = []
-    var addressList: [Address]? = []
+    var userList: [User] = []
+    var addressList: [Address] = []
     var firstAddr: Address? = nil
+
+    // MARK: - 基础测试
 
     func testAPIDemo() {
         Task {
             do {
-                let r = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/profile", .get)
-                    .param(.kv("user_name", "jack"))
-                    .param(.kv("page", 1))
-                    .header(ZTAPIHeader.h(key: "Content-Type", value: "application/json"))
-                    .send()
-                print("✅ Success: \(r)")
+                // 直接返回 Codable 类型
+                let user: User = try await ZTAPI<ZTAPIKVParam>(
+                    "https://jsonplaceholder.typicode.com/users/1",
+                    provider: ZTAlamofireProvider.shared
+                )
+                .params(.kv("user_name", "jack"))
+                .headers(.contentType)
+                .response()
+                print("✅ Success: \(user.name)")
             } catch {
                 print("❌ Error: \(error.localizedDescription)")
             }
         }
     }
 
-    /// 使用 URLSession Provider 测试
     func testWithURLSessionProvider() async {
         do {
-            let r = try await ZTAPI<ZTAPIKVParam>(
+            let user: User = try await ZTAPI<ZTAPIKVParam>(
                 "https://jsonplaceholder.typicode.com/users/1",
                 .get,
                 provider: ZTURLSessionProvider.shared
             )
-            .send()
-            print("✅ URLSessionProvider 测试成功: \(r)")
+            .response()
+            print("✅ URLSessionProvider 测试成功: \(user.name)")
         } catch {
             print("❌ URLSessionProvider 测试失败: \(error)")
         }
     }
 
-    /// 文件上传测试示例
+    // MARK: - 文件上传测试
+
     func testUpload() async {
         // 示例1: 上传单个图片 Data
         do {
@@ -163,10 +235,10 @@ class VM {
             let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
                 .data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg)
             ]
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post)
+            let data: Data = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(items)
                 .send()
-            print("✅ 上传单个 Data 成功")
+            print("✅ 上传单个 Data 成功，响应: \(data.count) bytes")
         } catch {
             print("❌ 上传 Data 失败: \(error)")
         }
@@ -177,9 +249,9 @@ class VM {
             try "test file content".write(to: fileURL, atomically: true, encoding: .utf8)
 
             let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .file(fileURL, name: "file")
+                .file(fileURL, name: "file", mimeType: .txt)
             ]
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post)
+            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(items)
                 .send()
             print("✅ 上传单个文件成功")
@@ -200,7 +272,7 @@ class VM {
                 .file(fileURL2, name: "photos", mimeType: .jpeg)
             ]
 
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multiple", .post)
+            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multiple", .post, provider: ZTAlamofireProvider.shared)
                 .upload(items)
                 .send()
             print("✅ 上传多个项成功（Data + File 混合）")
@@ -215,7 +287,7 @@ class VM {
                 .add(.data(Data("file2".utf8), name: "files", fileName: "file2.txt", mimeType: .txt))
                 .add(.data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
 
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multipart", .post)
+            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multipart", .post, provider: ZTAlamofireProvider.shared)
                 .multipart(formData)
                 .send()
             print("✅ Multipart 上传成功（文件 + 表单字段）")
@@ -225,9 +297,9 @@ class VM {
 
         // 示例5: 使用 body() 设置原始请求体
         do {
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/raw", .post)
+            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/raw", .post, provider: ZTAlamofireProvider.shared)
                 .body(Data("raw body data".utf8))
-                .header(.h(key: "Content-Type", value: ZTMimeType.octetStream.rawValue))
+                .headers(.h(key: "Content-Type", value: ZTMimeType.octetStream.rawValue))
                 .send()
             print("✅ 使用 body() 上传原始数据成功")
         } catch {
@@ -237,9 +309,9 @@ class VM {
         // 示例6: 使用自定义 MIME 类型
         do {
             let items: [ZTAPI<ZTAPIKVParam>.ZTUploadItem] = [
-                .data(Data("custom data".utf8), name: "file", mimeType: .mimeType("application/vnd.example"))
+                .data(Data("custom data".utf8), name: "file", mimeType: .custom(ext:"", mime: "application/vnd.example"))
             ]
-            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post)
+            _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(items)
                 .send()
             print("✅ 使用自定义 MIME 类型成功")
@@ -248,82 +320,74 @@ class VM {
         }
     }
 
-    /// 使用 Stub Provider 测试
-    func testWithStub() async {
-        // 切换到 stub provider
-        // let originalProvider = UserCenterAPI.provider
+    // MARK: - Stub 测试
 
+    func testWithStub() async {
         do {
-            // 使用 stub provider 测试
-            let r = try await ZTAPI<ZTAPIKVParam>(UserCenterAPI.fullPath("/users"), .get, provider: UserCenterAPI.stubProvider)
-                .send()
-            print("✅ Stub test success: \(r)")
+            let response: UserListResponse = try await ZTAPI<ZTAPIKVParam>(
+                UserCenterAPI.fullPath("/users"),
+                .get,
+                provider: UserCenterAPI.stubProvider
+            )
+            .response()
+            print("✅ Stub test success: \(response.data?.count ?? 0) users")
         } catch {
             print("✅ Stub test err: \(error)")
         }
     }
-    
+
+    // MARK: - 业务流程
+
     func performLogin() async {
-        // 1. 登录接口
+        // 1. 登录接口 - 使用 Codable 解析
         do {
-            let r = try await UserCenterAPI.login(userName: "jack", password: "123456").send()
-            if let t: String = r.get("data/token") {
-                self.token = t
-                print("✅ 登录成功，Token: \(t)")
+            let response: LoginResponse = try await UserCenterAPI.login(userName: "jack", password: "123456").response()
+            if let token = response.data?.token {
+                self.token = token
+                print("✅ 登录成功，Token: \(token)")
             }
         } catch {
             print("❌ 登录失败: \(error.localizedDescription)")
         }
-        
-        // 2. 获取用户信息
+    }
+
+    func fetchUserInfo() async {
         do {
-            let r = try await UserCenterAPI.userInfo(userId: "1384264339").send()
-            if let t: String = r.get("data/token") {
-                self.token = t
-            }
-            if let username: String = r.get("data/username") {
-                print("✅ 用户名: \(username)")
-            }
-            if let email: String = r.get("data/email") {
-                print("✅ 邮箱: \(email)")
+            let response: UserInfoResponse = try await UserCenterAPI.userInfo(userId: "1384264339").response()
+            if let data = response.data {
+                self.token = data.token
+                print("✅ 用户名: \(data.username)")
+                print("✅ 邮箱: \(data.email)")
             }
             print("✅ 获取用户信息成功")
         } catch {
             print("❌ 获取用户信息失败: \(error.localizedDescription)")
         }
-        
-        // 3. 获取用户列表
+    }
+
+    func fetchUserList() async {
         do {
-            let r = try await UserCenterAPI.userList
-                .parse(
-                    .init(type: [User].self),           // 解析整个响应为 [User]
-                    .init("/0/address", type: Address.self),  // 解析第一个用户的地址
-                    .init("/*/address", type: [Address].self)  // 解析所有用户的地址
-                )
-                .send()
-            
-            print("✅ 获取用户列表成功")
-            
-            // 从解析结果中获取数据
-            if let users: [User] = r.get("/") {
-                self.userList = users
-                print("✅ userList: \(users.count) 个用户")
-                if let firstUser = users.first {
-                    print("   第一个用户: \(firstUser.name)")
-                }
-            }
-            
-            if let firstAddress: Address = r.get("/0/address") {
-                self.firstAddr = firstAddress
-                print("✅ firstAddr: \(firstAddress.city)")
-            }
-            
-            if let addresses: [Address] = r.get("/*/address") {
-                self.addressList = addresses
-                print("✅ addressList: \(addresses.count) 个地址")
+            // 方式1: 如果 API 直接返回数组
+            let users: [User] = try await UserCenterAPI.userList.response()
+            self.userList = users
+            print("✅ 获取用户列表成功: \(users.count) 个用户")
+            if let first = users.first {
+                print("   第一个用户: \(first.name)")
             }
         } catch {
             print("❌ 获取用户列表失败: \(error.localizedDescription)")
+        }
+    }
+
+    func fetchSingleUser() async {
+        do {
+            let user: User = try await UserCenterAPI.user(id: 1).response()
+            print("✅ 获取单个用户成功: \(user.name)")
+            if let address = user.address {
+                print("   地址: \(address.city)")
+            }
+        } catch {
+            print("❌ 获取单个用户失败: \(error.localizedDescription)")
         }
     }
 }

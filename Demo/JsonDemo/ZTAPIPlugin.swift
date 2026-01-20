@@ -7,28 +7,6 @@
 
 import Foundation
 
-// MARK: - Plugin
-
-/// ZTAPI 插件协议，用于拦截和增强请求
-protocol ZTAPIPlugin: Sendable {
-    /// 请求即将发送
-    func willSend(_ request: inout URLRequest) async throws
-    /// 收到响应
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
-    /// 发生错误
-    func didCatch(_ error: Error) async throws
-    /// 处理响应数据，可修改返回的数据（在 didReceive 之后，返回给调用者之前）
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
-}
-
-/// 默认空实现
-extension ZTAPIPlugin {
-    func willSend(_ request: inout URLRequest) async throws {}
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws {}
-    func didCatch(_ error: Error) async throws {}
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data { data }
-}
-
 // MARK: - Built-in Plugins
 
 /// 日志插件

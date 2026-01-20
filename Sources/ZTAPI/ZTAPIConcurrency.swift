@@ -11,7 +11,7 @@ import Foundation
 
 /// 并发控制信号量（Actor 保护）
 /// 用于限制同时进行的网络请求数量
-private actor ConcurrencySemaphore {
+private actor ZTConcurrencySemaphore {
     private var currentCount = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
     let maxCount: Int
@@ -51,17 +51,13 @@ private actor ConcurrencySemaphore {
     }
 }
 
+
 /// 并发控制 Provider
 /// 限制同时进行的网络请求数量，避免过多并发导致资源耗尽
 final class ZTConcurrencyProvider: ZTAPIProvider {
-    private let baseProvider: any ZTAPIProvider
-    private let semaphore: ConcurrencySemaphore
-
-    /// 基础 Provider
-    var plugins: [any ZTAPIPlugin] { baseProvider.plugins }
-
-    /// 重试策略（透传给 baseProvider）
-    var retryPolicy: (any ZTAPIRetryPolicy)? { baseProvider.retryPolicy }
+    /// 底层 Provider（暴露以便外部访问和复用）
+    let baseProvider: any ZTAPIProvider
+    private let semaphore: ZTConcurrencySemaphore
 
     /// 当前最大并发数
     var maxConcurrentOperationCount: Int {
@@ -79,25 +75,17 @@ final class ZTConcurrencyProvider: ZTAPIProvider {
     /// - Parameters:
     ///   - baseProvider: 底层 Provider，实际执行网络请求
     ///   - maxConcurrency: 最大并发数，默认 6
-    init(
-        baseProvider: any ZTAPIProvider,
-        maxConcurrency: Int = 6
-    ) {
+    init(baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
         self.baseProvider = baseProvider
-        self.semaphore = ConcurrencySemaphore(maxCount: maxConcurrency)
+        self.semaphore = ZTConcurrencySemaphore(maxCount: maxConcurrency)
     }
 
     /// 发送请求，受并发数限制控制
     /// - Parameters:
     ///   - urlRequest: 请求对象
-    ///   - timeout: 超时时间（秒），nil 使用默认值
     ///   - uploadProgress: 上传进度回调（可选）
-    /// - Returns: 响应数据
-    func request(
-        _ urlRequest: URLRequest,
-        timeout: TimeInterval?,
-        uploadProgress: ZTUploadProgressHandler?
-    ) async throws -> Data {
+    /// - Returns: (响应数据, HTTP响应)
+    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse) {
         // 获取执行许可（如果达到上限会等待）
         await semaphore.acquire()
 
@@ -109,51 +97,26 @@ final class ZTConcurrencyProvider: ZTAPIProvider {
         }
 
         // 执行实际的网络请求
-        return try await baseProvider.request(
-            urlRequest,
-            timeout: timeout,
-            uploadProgress: uploadProgress
-        )
+        return try await baseProvider.request(urlRequest, uploadProgress: uploadProgress)
     }
-}
-
-/// 便捷初始化：创建带并发控制的默认 Provider
-/// - Parameters:
-///   - maxConcurrency: 最大并发数
-/// - Returns: 包装后的 Provider
-func concurrencyProvider(
-    maxConcurrency: Int = 6
-) -> any ZTAPIProvider {
-    // 获取默认的 URLSession Provider
-    let baseProvider = ZTURLSessionProvider()
-    return ZTConcurrencyProvider(
-        baseProvider: baseProvider,
-        maxConcurrency: maxConcurrency
-    )
-}
-
-/// 便捷初始化：为指定 Provider 添加并发控制
-/// - Parameters:
-///   - provider: 底层 Provider
-///   - maxConcurrency: 最大并发数
-/// - Returns: 包装后的 Provider
-func withConcurrency(
-    _ provider: any ZTAPIProvider,
-    maxConcurrency: Int = 6
-) -> any ZTAPIProvider {
-    ZTConcurrencyProvider(
-        baseProvider: provider,
-        maxConcurrency: maxConcurrency
-    )
 }
 
 // MARK: - Global API Provider
 
 /// App 全局 API Provider 单例
 /// 所有网络请求通过此 Provider 发起，自动控制并发数
+/// 使用前必须先调用 configure(_:) 配置
 final class ZTGlobalAPIProvider: @unchecked Sendable {
-    /// 共享实例，配置好并发控制（默认最多 6 个并发）
-    static let shared = ZTGlobalAPIProvider()
+    nonisolated(unsafe) private static var _instance: ZTGlobalAPIProvider?
+
+    /// 共享实例
+    /// 使用前必须先调用 configure(_:) 配置
+    static var shared: ZTGlobalAPIProvider {
+        guard let instance = _instance else {
+            fatalError("ZTGlobalAPIProvider not configured. Call configure(_:) first.")
+        }
+        return instance
+    }
 
     /// 底层并发控制 Provider
     private(set) var provider: any ZTAPIProvider
@@ -164,25 +127,43 @@ final class ZTGlobalAPIProvider: @unchecked Sendable {
     /// 修改并发数时的锁
     private let lock = DispatchQueue(label: "com.zt.global-api.lock")
 
-    private init() {
-        self.currentMaxConcurrency = 6
-        // 创建基础 Provider
-        let baseProvider = ZTURLSessionProvider()
-        // 包装并发控制，最多 6 个并发
-        self.provider = ZTConcurrencyProvider(
-            baseProvider: baseProvider,
-            maxConcurrency: 6
-        )
+    /// 原始基础 Provider（不含并发控制包装）
+    private var baseProvider: any ZTAPIProvider
+
+    private init(baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
+        self.currentMaxConcurrency = maxConcurrency
+        self.baseProvider = baseProvider
+        // 包装并发控制
+        self.provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: maxConcurrency)
     }
 
-    /// 修改全局并发数
+    /// 配置全局 Provider
+    /// - Parameters:
+    ///   - baseProvider: 底层 Provider
+    ///   - maxConcurrency: 最大并发数，默认 6
+    static func configure(_ baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
+        _instance = ZTGlobalAPIProvider(baseProvider: baseProvider, maxConcurrency: maxConcurrency)
+    }
+
+    /// 重置配置（主要用于测试）
+    static func reset() {
+        _instance = nil
+    }
+
+    /// 设置新的基础 Provider（保留当前并发数配置）
+    /// - Parameter baseProvider: 新的基础 Provider
+    func setProvider(_ baseProvider: any ZTAPIProvider) {
+        lock.sync {
+            self.baseProvider = baseProvider
+            provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: currentMaxConcurrency)
+        }
+    }
+
+    /// 修改全局并发数（保留现有 baseProvider）
+    /// - Parameter count: 新的最大并发数
     func setMaxConcurrency(_ count: Int) {
         lock.sync {
-            let baseProvider = ZTURLSessionProvider()
-            provider = ZTConcurrencyProvider(
-                baseProvider: baseProvider,
-                maxConcurrency: count
-            )
+            provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: count)
             currentMaxConcurrency = count
         }
     }
