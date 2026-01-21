@@ -13,5 +13,5 @@ ZTAPI
 
   s.ios.deployment_target = '13.0'
 
-  s.source_files = 'ZTAPI/Sources/**/*'
+  s.source_files = 'Sources/**/*'
 end
