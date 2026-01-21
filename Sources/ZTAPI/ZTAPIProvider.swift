@@ -8,7 +8,7 @@
 import Foundation
 
 /// 网络请求提供者协议
-protocol ZTAPIProvider: Sendable {
+public protocol ZTAPIProvider: Sendable {
     /// 发送请求
     /// - Parameters:
     ///   - urlRequest: 请求对象（超时已通过 URLRequest.timeoutInterval 设置）
@@ -20,8 +20,7 @@ protocol ZTAPIProvider: Sendable {
 
 
 
-
-/// Provider 重试包装器（请求级别重试）
+/// Provider 重试包装器（请求级别重试，内部使用）
 final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
     private let baseProvider: any ZTAPIProvider
     private let retryPolicy: any ZTAPIRetryPolicy

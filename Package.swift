@@ -18,6 +18,10 @@ let package = Package(
 //        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.11.0")
     ],
     targets: [
-//        .target(name: "ZTAPI", dependencies: ["ZTJSON", "SwiftyJSON", "Alamofire"]),
+        .target(
+            name: "ZTAPI",
+            dependencies: [],
+            path: "Sources/ZTAPI"
+        ),
     ]
 )

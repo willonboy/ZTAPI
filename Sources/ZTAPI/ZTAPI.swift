@@ -19,32 +19,34 @@ import UniformTypeIdentifiers
 
 // MARK: - Error
 
-struct ZTAPIError: CustomStringConvertible, Error {
-    var code: Int
-    var msg: String
+/// ZTAPI 错误类型
+public struct ZTAPIError: CustomStringConvertible, Error {
+    public var code: Int
+    public var msg: String
 
-    init(_ code: Int, _ msg: String) {
+    public init(_ code: Int, _ msg: String) {
         self.code = code
         self.msg = msg
     }
 
-    var description: String {
+    public var description: String {
         "ZTAPIError \(code): \(msg)"
     }
 }
 
 // MARK: - HTTP Header
 
-enum ZTAPIHeader: Sendable {
+/// HTTP Header 封装
+public enum ZTAPIHeader: Sendable {
     case h(key: String, value: String)
 
-    var key: String {
+    public var key: String {
         switch self {
         case .h(let k, _): k
         }
     }
 
-    var value: String {
+    public var value: String {
         switch self {
         case .h(_, let v): v
         }
@@ -55,29 +57,30 @@ enum ZTAPIHeader: Sendable {
 
 #if !canImport(ZTJSON)
 /// API 参数协议
-protocol ZTAPIParamProtocol: Sendable {
+public protocol ZTAPIParamProtocol: Sendable {
     var key: String { get }
     var value: Sendable { get }
     static func isValid(_ params: [String: Sendable]) -> Bool
 }
 #endif
 
-enum ZTAPIKVParam: ZTAPIParamProtocol {
+/// 键值对参数，用于直接传参
+public enum ZTAPIKVParam: ZTAPIParamProtocol {
     case kv(String, Sendable)
 
-    var key: String {
+    public var key: String {
         switch self {
         case .kv(let k, _): return k
         }
     }
 
-    var value: Sendable {
+    public var value: Sendable {
         switch self {
         case .kv(_, let v): return v
         }
     }
 
-    static func isValid(_ params: [String: Sendable]) -> Bool {
+    public static func isValid(_ params: [String: Sendable]) -> Bool {
         return true
     }
 }
@@ -85,25 +88,25 @@ enum ZTAPIKVParam: ZTAPIParamProtocol {
 // MARK: - ParameterEncoding
 
 /// 参数编码协议
-protocol ZTParameterEncoding: Sendable {
+public protocol ZTParameterEncoding: Sendable {
     func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws
 }
 
 /// URL 编码
-struct ZTURLEncoding: ZTParameterEncoding {
-    enum Destination {
+public struct ZTURLEncoding: ZTParameterEncoding {
+    public enum Destination: Sendable {
         case methodDependent
         case queryString
         case httpBody
     }
 
-    let destination: Destination
+    public let destination: Destination
 
-    init(_ destination: Destination = .methodDependent) {
+    public init(_ destination: Destination = .methodDependent) {
         self.destination = destination
     }
 
-    func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
+    public func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
         guard let url = request.url else {
             throw ZTAPIError(-1, "URL is nil")
         }
@@ -147,8 +150,10 @@ struct ZTURLEncoding: ZTParameterEncoding {
 }
 
 /// JSON 编码
-struct ZTJSONEncoding: ZTParameterEncoding {
-    func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
+public struct ZTJSONEncoding: ZTParameterEncoding {
+    public init() {}
+
+    public func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         if JSONSerialization.isValidJSONObject(params) {
@@ -162,61 +167,61 @@ struct ZTJSONEncoding: ZTParameterEncoding {
 // MARK: - MIME Type
 
 /// MIME 类型
-enum ZTMimeType: Sendable, Hashable {
+public enum ZTMimeType: Sendable, Hashable {
     case custom(ext: String, mime: String)
 
     /// MIME 类型字符串值
-    var rawValue: String {
+    public var rawValue: String {
         if case .custom(_, let mime) = self { return mime }
         return ""
     }
 
     /// 文件扩展名
-    var ext: String {
+    public var ext: String {
         if case .custom(let ext, _) = self { return ext }
         return ""
     }
 
-    static let jpeg = custom(ext: "jpg", mime: "image/jpeg")
-    static let jpg = jpeg
-    static let png = custom(ext: "png", mime: "image/png")
-    static let gif = custom(ext: "gif", mime: "image/gif")
-    static let webp = custom(ext: "webp", mime: "image/webp")
-    static let svg = custom(ext: "svg", mime: "image/svg+xml")
+    public static let jpeg = custom(ext: "jpg", mime: "image/jpeg")
+    public static let jpg = jpeg
+    public static let png = custom(ext: "png", mime: "image/png")
+    public static let gif = custom(ext: "gif", mime: "image/gif")
+    public static let webp = custom(ext: "webp", mime: "image/webp")
+    public static let svg = custom(ext: "svg", mime: "image/svg+xml")
 
-    static let json = custom(ext: "json", mime: "application/json")
-    static let pdf = custom(ext: "pdf", mime: "application/pdf")
-    static let txt = custom(ext: "txt", mime: "text/plain")
-    static let html = custom(ext: "html", mime: "text/html")
-    static let xml = custom(ext: "xml", mime: "application/xml")
+    public static let json = custom(ext: "json", mime: "application/json")
+    public static let pdf = custom(ext: "pdf", mime: "application/pdf")
+    public static let txt = custom(ext: "txt", mime: "text/plain")
+    public static let html = custom(ext: "html", mime: "text/html")
+    public static let xml = custom(ext: "xml", mime: "application/xml")
 
-    static let formUrlEncoded = custom(ext: "", mime: "application/x-www-form-urlencoded")
-    static let multipartFormData = custom(ext: "", mime: "multipart/form-data")
-    static let octetStream = custom(ext: "", mime: "application/octet-stream")
+    public static let formUrlEncoded = custom(ext: "", mime: "application/x-www-form-urlencoded")
+    public static let multipartFormData = custom(ext: "", mime: "multipart/form-data")
+    public static let octetStream = custom(ext: "", mime: "application/octet-stream")
 
-    static let zip = custom(ext: "zip", mime: "application/zip")
-    static let gzip = custom(ext: "gz", mime: "application/gzip")
+    public static let zip = custom(ext: "zip", mime: "application/zip")
+    public static let gzip = custom(ext: "gz", mime: "application/gzip")
 }
 
 // MARK: - Multipart Form Data
 
 /// Multipart 表单数据
-struct ZTMultipartFormData: Sendable {
-    let parts: [ZTMultipartFormBodyPart]
-    let boundary: String
+public struct ZTMultipartFormData: Sendable {
+    public let parts: [ZTMultipartFormBodyPart]
+    public let boundary: String
 
-    init(parts: [ZTMultipartFormBodyPart] = [], boundary: String? = nil) {
+    public init(parts: [ZTMultipartFormBodyPart] = [], boundary: String? = nil) {
         self.parts = parts
         self.boundary = boundary ?? "Boundary-\(UUID().uuidString)"
     }
 
     /// 添加表单部分
-    func add(_ part: ZTMultipartFormBodyPart) -> ZTMultipartFormData {
+    public func add(_ part: ZTMultipartFormBodyPart) -> ZTMultipartFormData {
         ZTMultipartFormData(parts: parts + [part], boundary: boundary)
     }
 
     /// 构建完整的请求数据
-    func build() throws -> Data {
+    public func build() throws -> Data {
         var body = Data()
         let line = "\r\n"
         let boundaryLine = "--\(boundary)\r\n"
@@ -249,12 +254,12 @@ struct ZTMultipartFormData: Sendable {
 }
 
 /// Multipart 数据提供者
-enum ZTMultipartDataProvider: Sendable {
+public enum ZTMultipartDataProvider: Sendable {
     case data(Data)
     case file(URL, mapIfSupported: Bool = true)
 
     /// 获取数据，文件读取失败时会抛出错误
-    func getData() throws -> Data {
+    public func getData() throws -> Data {
         switch self {
         case .data(let data):
             return data
@@ -278,13 +283,13 @@ enum ZTMultipartDataProvider: Sendable {
 }
 
 /// Multipart 表单 body 部分
-struct ZTMultipartFormBodyPart: Sendable {
-    let name: String
-    let provider: ZTMultipartDataProvider
-    let fileName: String?
-    let mimeType: ZTMimeType
+public struct ZTMultipartFormBodyPart: Sendable {
+    public let name: String
+    public let provider: ZTMultipartDataProvider
+    public let fileName: String?
+    public let mimeType: ZTMimeType
 
-    init(
+    public init(
         name: String,
         provider: ZTMultipartDataProvider,
         fileName: String? = nil,
@@ -297,7 +302,7 @@ struct ZTMultipartFormBodyPart: Sendable {
     }
 
     /// 便捷初始化：从 Data 创建
-    static func data(_ data: Data, name: String, fileName: String? = nil, mimeType: ZTMimeType = .octetStream) -> ZTMultipartFormBodyPart {
+    public static func data(_ data: Data, name: String, fileName: String? = nil, mimeType: ZTMimeType = .octetStream) -> ZTMultipartFormBodyPart {
         ZTMultipartFormBodyPart(
             name: name,
             provider: .data(data),
@@ -307,7 +312,7 @@ struct ZTMultipartFormBodyPart: Sendable {
     }
 
     /// 便捷初始化：从文件 URL 创建
-    static func file(_ url: URL, name: String, fileName: String? = nil, mimeType: ZTMimeType) -> ZTMultipartFormBodyPart {
+    public static func file(_ url: URL, name: String, fileName: String? = nil, mimeType: ZTMimeType) -> ZTMultipartFormBodyPart {
         ZTMultipartFormBodyPart(
             name: name,
             provider: .file(url),
@@ -318,14 +323,14 @@ struct ZTMultipartFormBodyPart: Sendable {
 }
 
 /// Multipart 编码
-struct ZTMultipartEncoding: ZTParameterEncoding {
-    let formData: ZTMultipartFormData
+public struct ZTMultipartEncoding: ZTParameterEncoding {
+    public let formData: ZTMultipartFormData
 
-    init(_ formData: ZTMultipartFormData) {
+    public init(_ formData: ZTMultipartFormData) {
         self.formData = formData
     }
 
-    func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
+    public func encode(_ request: inout URLRequest, with params: [String: Sendable]) throws {
         let boundary = formData.boundary
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = try formData.build()
@@ -335,14 +340,19 @@ struct ZTMultipartEncoding: ZTParameterEncoding {
 // MARK: - Upload Progress
 
 /// 上传进度信息
-struct ZTUploadProgress: Sendable {
+public struct ZTUploadProgress: Sendable {
     /// 已写入/上传的字节数
-    let bytesWritten: Int64
+    public let bytesWritten: Int64
     /// 总字节数（-1 表示未知，例如 chunked 编码）
-    let totalBytes: Int64
+    public let totalBytes: Int64
+
+    public init(bytesWritten: Int64, totalBytes: Int64) {
+        self.bytesWritten = bytesWritten
+        self.totalBytes = totalBytes
+    }
 
     /// 计算进度百分比（0.0 - 1.0）
-    var fractionCompleted: Double {
+    public var fractionCompleted: Double {
         if totalBytes > 0 {
             return Double(bytesWritten) / Double(totalBytes)
         }
@@ -350,12 +360,12 @@ struct ZTUploadProgress: Sendable {
     }
 
     /// 已上传字节的可读格式
-    var bytesWrittenFormatted: String {
+    public var bytesWrittenFormatted: String {
         ByteCountFormatter.string(fromByteCount: bytesWritten, countStyle: .file)
     }
 
     /// 总字节的可读格式
-    var totalBytesFormatted: String {
+    public var totalBytesFormatted: String {
         if totalBytes > 0 {
             return ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
         }
@@ -364,11 +374,12 @@ struct ZTUploadProgress: Sendable {
 }
 
 /// 上传进度回调类型
-typealias ZTUploadProgressHandler = @Sendable (ZTUploadProgress) -> Void
+public typealias ZTUploadProgressHandler = @Sendable (ZTUploadProgress) -> Void
 
 // MARK: - HTTP Method
 
-enum ZTHTTPMethod: String {
+/// HTTP 请求方法
+public enum ZTHTTPMethod: String {
     case get = "GET"
     case post = "POST"
     case put = "PUT"
@@ -384,22 +395,22 @@ enum ZTHTTPMethod: String {
 
 #if canImport(ZTJSON)
 /// 数据解析配置：用于指定 JSON 路径和目标类型
-struct ZTAPIParseConfig: Hashable {
-    let xpath: String
-    let type: any ZTJSONInitializable.Type
-    let isAllowMissing: Bool
+public struct ZTAPIParseConfig: Hashable {
+    public let xpath: String
+    public let type: any ZTJSONInitializable.Type
+    public let isAllowMissing: Bool
 
-    init(_ xpath: String = "/", type: any ZTJSONInitializable.Type, _ isAllowMissing: Bool = true) {
+    public init(_ xpath: String = "/", type: any ZTJSONInitializable.Type, _ isAllowMissing: Bool = true) {
         self.xpath = xpath.isEmpty ? "/" : xpath
         self.type = type
         self.isAllowMissing = isAllowMissing
     }
 
-    static func == (lhs: ZTAPIParseConfig, rhs: ZTAPIParseConfig) -> Bool {
+    public static func == (lhs: ZTAPIParseConfig, rhs: ZTAPIParseConfig) -> Bool {
         lhs.xpath == rhs.xpath
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(xpath)
     }
 }
@@ -409,7 +420,7 @@ struct ZTAPIParseConfig: Hashable {
 // MARK: - Plugin
 
 /// ZTAPI 插件协议，用于拦截和增强请求
-protocol ZTAPIPlugin: Sendable {
+public protocol ZTAPIPlugin: Sendable {
     /// 请求即将发送
     func willSend(_ request: inout URLRequest) async throws
     /// 收到响应
@@ -422,10 +433,10 @@ protocol ZTAPIPlugin: Sendable {
 
 /// 默认空实现
 extension ZTAPIPlugin {
-    func willSend(_ request: inout URLRequest) async throws {}
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws {}
-    func didCatch(_ error: Error) async throws {}
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data { data }
+    public func willSend(_ request: inout URLRequest) async throws {}
+    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {}
+    public func didCatch(_ error: Error) async throws {}
+    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data { data }
 }
 
 
@@ -433,13 +444,13 @@ extension ZTAPIPlugin {
 
 /// ZTAPI 网络请求类
 /// 使用 Codable 协议进行响应解析，不依赖第三方 JSON 库
-class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
-    var urlStr: String
-    var method: ZTHTTPMethod
-    var params: [String: Sendable] = [:]
-    var headers: [String: String] = [:]
-    var bodyData: Data? = nil
-    var encoding: any ZTParameterEncoding = ZTURLEncoding()
+public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
+    public private(set) var urlStr: String
+    public private(set) var method: ZTHTTPMethod
+    public private(set) var params: [String: Sendable] = [:]
+    public private(set) var headers: [String: String] = [:]
+    public private(set) var bodyData: Data? = nil
+    public private(set) var encoding: any ZTParameterEncoding = ZTURLEncoding()
 
     private let provider: any ZTAPIProvider
     private var plugins: [any ZTAPIPlugin] = []
@@ -448,37 +459,47 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     private var uploadProgressHandler: ZTUploadProgressHandler?
     private var jsonDecoder: JSONDecoder = JSONDecoder()
 
-    init(_ url: String, _ method: ZTHTTPMethod = .get, provider: any ZTAPIProvider) {
+    public init(_ url: String, _ method: ZTHTTPMethod = .get, provider: any ZTAPIProvider) {
         self.urlStr = url
         self.method = method
         self.provider = provider
     }
 
-    func params(_ ps: P...) -> Self {
+    /// 添加请求参数
+    @discardableResult
+    public func params(_ ps: P...) -> Self {
         ps.forEach { p in
             params[p.key] = p.value
         }
         return self
     }
 
-    func params(_ ps: [String: Sendable]) -> Self {
+    /// 添加请求参数（字典形式）
+    @discardableResult
+    public func params(_ ps: [String: Sendable]) -> Self {
         params.merge(ps) { k, k2 in k2 }
         return self
     }
-    
-    func headers(_ hds: ZTAPIHeader...) -> Self {
+
+    /// 添加 HTTP 头
+    @discardableResult
+    public func headers(_ hds: ZTAPIHeader...) -> Self {
         for header in hds {
             headers[header.key] = header.value
         }
         return self
     }
 
-    func encoding(_ e: any ZTParameterEncoding) -> Self {
+    /// 设置参数编码
+    @discardableResult
+    public func encoding(_ e: any ZTParameterEncoding) -> Self {
         encoding = e
         return self
     }
 
-    func body(_ data: Data) -> Self {
+    /// 设置原始请求体
+    @discardableResult
+    public func body(_ data: Data) -> Self {
         bodyData = data
         return self
     }
@@ -486,7 +507,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     // MARK: - Upload
 
     /// 上传项
-    enum ZTUploadItem: Sendable {
+    public enum ZTUploadItem: Sendable {
         case data(Data, name: String, fileName: String? = nil, mimeType: ZTMimeType)
         case file(URL, name: String, fileName: String? = nil, mimeType: ZTMimeType)
 
@@ -501,34 +522,39 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     }
 
     /// 上传多个项（支持混合 Data 和 File）
-    func upload(_ items: ZTUploadItem...) -> Self {
+    @discardableResult
+    public func upload(_ items: ZTUploadItem...) -> Self {
         let parts = items.map { $0.bodyPart }
         return multipart(ZTMultipartFormData(parts: parts))
     }
 
     /// 使用 Multipart 数据上传（支持多个文件 + 其他表单字段）
-    func multipart(_ formData: ZTMultipartFormData) -> Self {
+    @discardableResult
+    public func multipart(_ formData: ZTMultipartFormData) -> Self {
         bodyData = nil
-        _ = encoding(ZTMultipartEncoding(formData))
+        encoding = ZTMultipartEncoding(formData)
         return self
     }
 
     // MARK: - Config
 
     /// 设置请求超时时间（秒）
-    func timeout(_ interval: TimeInterval) -> Self {
+    @discardableResult
+    public func timeout(_ interval: TimeInterval) -> Self {
         requestTimeout = interval
         return self
     }
 
     /// 设置重试策略
-    func retry(_ policy: any ZTAPIRetryPolicy) -> Self {
+    @discardableResult
+    public func retry(_ policy: (any ZTAPIRetryPolicy)?) -> Self {
         requestRetryPolicy = policy
         return self
     }
 
     /// 设置上传进度回调
-    func uploadProgress(_ handler: @escaping ZTUploadProgressHandler) -> Self {
+    @discardableResult
+    public func uploadProgress(_ handler: @escaping ZTUploadProgressHandler) -> Self {
         uploadProgressHandler = handler
         return self
     }
@@ -540,13 +566,16 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
             }.response()
      */
-    func jsonDecoder(_ configure: (inout JSONDecoder) -> Void) -> Self {
+    /// 配置 JSON 解码器
+    @discardableResult
+    public func jsonDecoder(_ configure: (inout JSONDecoder) -> Void) -> Self {
         configure(&jsonDecoder)
         return self
     }
 
     /// 添加插件
-    func plugins(_ ps: (any ZTAPIPlugin)...) -> Self {
+    @discardableResult
+    public func plugins(_ ps: (any ZTAPIPlugin)...) -> Self {
         plugins.append(contentsOf: ps)
         return self
     }
@@ -554,7 +583,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     // MARK: - Send
 
     /// 发送请求并返回原始 Data
-    func send() async throws -> Data {
+    public func send() async throws -> Data {
         if P.isValid(params) == false {
             throw ZTAPIError(-1, "Request params invalid")
         }
@@ -617,17 +646,18 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             throw error
         }
     }
-
+    
     /// 发送请求并返回解码后的 Codable 对象
-    func response<T: Codable>() async throws -> T {
+    public func response<T: Decodable>() async throws -> T {
         let data = try await send()
         return try jsonDecoder.decode(T.self, from: data)
     }
 
 #if canImport(ZTJSON)
-    func parseResponse(_ configs: ZTAPIParseConfig...) async throws -> [String: any ZTJSONInitializable] {
+    /// 运行时 XPath 解析多个字段
+    public func parseResponse(_ configs: ZTAPIParseConfig...) async throws -> [String: any ZTJSONInitializable] {
         let data = try await send()
-        
+
         // 解析 JSON
         let json = JSON(data)
         var res: [String: any ZTJSONInitializable] = [:]
@@ -648,7 +678,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         return res
     }
 #endif
-    
+
     // MARK: - Publisher
 
     /// 用于安全地在跨并发域传递 Future.Promise 的包装器
@@ -657,7 +687,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     }
 
     /// 发送请求并返回 Codable 类型的 Publisher
-    func publisher<T: Codable & Sendable>() -> AnyPublisher<T, Error> {
+    public func publisher<T: Codable & Sendable>() -> AnyPublisher<T, Error> {
         Deferred {
             Future { promise in
                 let promiseTransfer = PromiseTransfer(value: promise)
@@ -682,7 +712,7 @@ class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     // MARK: - Global Provider Convenience
 
     /// 使用全局 Provider 创建 API 实例
-    static func global(_ url: String, _ method: ZTHTTPMethod = .get) -> ZTAPI<P> {
+    public static func global(_ url: String, _ method: ZTHTTPMethod = .get) -> ZTAPI<P> {
         ZTAPI(url, method, provider: ZTGlobalAPIProvider.shared.provider)
     }
 

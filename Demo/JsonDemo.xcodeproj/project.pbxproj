@@ -163,7 +163,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7B0E3EDD2D978AC3002EA290 /* XCRemoteSwiftPackageReference "Alamofire" */,
-				97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ZTJson" */,
+				97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7B0E3EC32D9786F1002EA290 /* Products */;
@@ -436,12 +436,12 @@
 				minimumVersion = 5.11.0;
 			};
 		};
-		97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ZTJson" */ = {
+		97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/willonboy/ZTJson";
+			repositoryURL = "https://github.com/willonboy/ztjson.git";
 			requirement = {
-				branch = "feature/codable-support";
-				kind = branch;
+				kind = revision;
+				revision = bca045f488adf345786dce4016f800047876ecbc;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -458,7 +458,7 @@
 		};
 		97046CBA2F16A8520050B940 /* ZTJSON */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ZTJson" */;
+			package = 97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */;
 			productName = ZTJSON;
 		};
 /* End XCSwiftPackageProductDependency section */

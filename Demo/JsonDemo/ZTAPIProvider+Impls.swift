@@ -24,16 +24,16 @@ private actor UploadProgressReporter {
 }
 
 /// 基于 URLSession 的 Provider 实现
-final class ZTURLSessionProvider: @unchecked Sendable, ZTAPIProvider {
-    static let shared = ZTURLSessionProvider()
+public final class ZTURLSessionProvider: @unchecked Sendable, ZTAPIProvider {
+    public static let shared = ZTURLSessionProvider()
 
     private let session: URLSession
 
-    init(session: URLSession = .shared) {
+    public init(session: URLSession = .shared) {
         self.session = session
     }
 
-    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
+    public func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
 #if DEBUG
         print("[ZTURLSessionProvider] \(urlRequest.httpMethod ?? "") \(urlRequest.url?.absoluteString ?? "")")
 #endif
@@ -184,16 +184,16 @@ private struct URLSessionUploadOperation {
 // MARK: - Alamofire Provider
 
 /// 基于 Alamofire 的 Provider实现
-final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
-    static let shared = ZTAlamofireProvider()
+public final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
+    public static let shared = ZTAlamofireProvider()
 
     private let session: Session
 
-    init(session: Session = .default) {
+    public init(session: Session = .default) {
         self.session = session
     }
 
-    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
+    public func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
         // 构建请求，添加上传进度支持
         var dataRequest = session.request(urlRequest)
 #if DEBUG
@@ -247,10 +247,10 @@ final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
 // MARK: - Stub Provider
 
 /// 用于测试的 Stub Provider
-final class ZTStubProvider: @unchecked Sendable, ZTAPIProvider {
+public final class ZTStubProvider: @unchecked Sendable, ZTAPIProvider {
     private let stubs: [String: StubResponse]
 
-    struct StubResponse: Sendable {
+    public struct StubResponse: Sendable {
         let statusCode: Int
         let data: Data
         let delay: TimeInterval
@@ -262,11 +262,11 @@ final class ZTStubProvider: @unchecked Sendable, ZTAPIProvider {
         }
     }
 
-    init(stubs: [String: StubResponse] = [:]) {
+    public init(stubs: [String: StubResponse] = [:]) {
         self.stubs = stubs
     }
 
-    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
+    public func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
         // Stub Provider 忽略进度回调
         _ = uploadProgress
 
@@ -320,7 +320,7 @@ final class ZTStubProvider: @unchecked Sendable, ZTAPIProvider {
     }
 
     /// 便捷初始化 - 使用 JSON 字典
-    static func jsonStubs(
+    public static func jsonStubs(
         _ stubs: [String: [String: Any]],
         statusCode: Int = 200
     ) -> ZTStubProvider {

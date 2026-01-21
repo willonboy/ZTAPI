@@ -10,25 +10,25 @@ import Foundation
 // MARK: - Built-in Plugins
 
 /// 日志插件
-struct ZTLogPlugin: ZTAPIPlugin {
-    enum LogLevel {
+public struct ZTLogPlugin: ZTAPIPlugin {
+    public enum LogLevel: Sendable {
         case verbose
         case simple
         case none
     }
 
-    let level: LogLevel
+    public let level: LogLevel
 
     /// 最大 body 打印长度（字节），超过则只打印字节数
     /// 防止打印大 JSON 导致内存峰值
     private let maxBodyPrintLength: Int
 
-    init(level: LogLevel = .verbose, maxBodyPrintLength: Int = 1024) {
+    public init(level: LogLevel = .verbose, maxBodyPrintLength: Int = 1024) {
         self.level = level
         self.maxBodyPrintLength = maxBodyPrintLength
     }
 
-    func willSend(_ request: inout URLRequest) async throws {
+    public func willSend(_ request: inout URLRequest) async throws {
         guard level != .none else { return }
 
         if level == .verbose {
@@ -65,7 +65,7 @@ struct ZTLogPlugin: ZTAPIPlugin {
         }
     }
 
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws {
+    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {
         guard level == .verbose else { return }
 
         var output = """
@@ -99,17 +99,21 @@ struct ZTLogPlugin: ZTAPIPlugin {
         print(output)
     }
 
-    func didCatch(_ error: Error) async throws {
+    public func didCatch(_ error: Error) async throws {
         guard level != .none else { return }
         print("[ZTAPI] Error: \(error)")
     }
 }
 
 /// 认证插件 - 自动添加 Token
-struct ZTAuthPlugin: ZTAPIPlugin {
+public struct XMAuthPlugin: ZTAPIPlugin {
     let token: @Sendable () -> String?
-
-    func willSend(_ request: inout URLRequest) async throws {
+    
+    public init(_ handler: @escaping @Sendable () -> String?) {
+        token = handler
+    }
+    
+    public func willSend(_ request: inout URLRequest) async throws {
         guard let token = token() else { return }
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
@@ -142,7 +146,7 @@ public actor ZTTokenRefresher {
 }
 
 /// Token 刷新插件
-struct ZTTokenRefreshPlugin: ZTAPIPlugin {
+public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
     let shouldRefresh: @Sendable (_ error: Error) -> Bool
     let refresh: @Sendable () async throws -> String
     let onRefresh: @Sendable (String) -> Void
@@ -162,11 +166,11 @@ struct ZTTokenRefreshPlugin: ZTAPIPlugin {
         self.refresher = useSingleFlight ? ZTTokenRefresher() : nil
     }
 
-    func willSend(_ request: inout URLRequest) async throws {
+    public func willSend(_ request: inout URLRequest) async throws {
         // 这里可以实现 token 过期检查
     }
 
-    func didCatch(_ error: Error) async throws {
+    public func didCatch(_ error: Error) async throws {
         if shouldRefresh(error) {
             do {
                 let newToken: String
@@ -186,8 +190,8 @@ struct ZTTokenRefreshPlugin: ZTAPIPlugin {
 }
 
 /// JSON 解码插件 - 自动将响应数据解析为 JSON 并重新编码
-struct ZTJSONDecodePlugin: ZTAPIPlugin {
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+public struct ZTJSONDecodePlugin: ZTAPIPlugin {
+    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
         // 尝试解析 JSON，美化后再编码返回
         guard let json = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) else {
@@ -198,17 +202,21 @@ struct ZTJSONDecodePlugin: ZTAPIPlugin {
 }
 
 /// 数据解密插件 - 示例：自动解密响应数据
-struct ZTDecryptPlugin: ZTAPIPlugin {
+public struct XMDecryptPlugin: ZTAPIPlugin {
     let decrypt: @Sendable (Data) -> Data
-
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+    
+    public init(_ handler: @escaping @Sendable (Data) -> Data) {
+        decrypt = handler
+    }
+    
+    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
         return decrypt(data)
     }
 }
 
 /// 响应头添加插件 - 示例：将响应头信息添加到数据中
-struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+public struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
+    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
         // 将响应头信息添加到 JSON 中
         guard let json = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments]),
               let jsonObject = json as? [String: Any] else {
