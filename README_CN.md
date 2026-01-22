@@ -10,10 +10,8 @@ ZTAPI 是一个超越 Moya 的现代化 Swift 网络请求库。通过 **enum �
 | 异步支持     | 原生 async/await                      | 闭包为主                   |
 | 模块化封装   | enum + 静态方法，类型安全            | enum 关联值，类型安全       |
 | 参数定义     | `@ZTAPIParam` 宏自动生成            | 手动构造参数                |
-| Key 映射     | @ZTAPIParam 宏自动转换              | 需配置 keyDecodingStrategy  |
 | XPath 解析   | 原生支持，直接映射嵌套字段           | 需手动定义嵌套模型          |
 | 响应解析     | Codable + ZTJSON（SwiftyJSON）双模式 | 主要使用 Codable            |
-| 并发控制     | 内置 Actor 信号量                    | 需自行实现                  |
 | 插件机制     | 4 个钩子，灵活拦截                   | PluginType（前置/后置）     |
 
 ## 安装
@@ -27,318 +25,150 @@ https://github.com/willonboy/ZTAPI.git
 ### CocoaPods
 
 ```ruby
-# 或从 Git 安装（开发版）
 pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 ```
 
-## 架构设计
+---
 
-### Provider 设计
+## 快速入门
 
-ZTAPI 通过 `ZTAPIProvider` 协议抽象底层网络实现，支持多种 Provider：
-
-```swift
-/// Provider 协议
-protocol ZTAPIProvider: Sendable {
-    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse)
-}
-```
-
-#### 内置 Provider 实现
-
-> 注：以下 Provider 的实现代码在 Demo 工程中，可根据需要复制到项目使用。
-
-| Provider               | 说明                         | 依赖      |
-| ---------------------- | ---------------------------- | --------- |
-| `ZTURLSessionProvider` | 基于原生 URLSession          | 无        |
-| `ZTAlamofireProvider`  | 基于 Alamofire               | Alamofire |
-| `ZTStubProvider`       | 用于单元测试的 Mock Provider | 无        |
-
-**ZTURLSessionProvider - 原生实现**
+最简单的 GET 请求：
 
 ```swift
-// 使用默认 URLSession.shared
-let provider = ZTURLSessionProvider()
+import ZTAPI
 
-// 使用自定义 URLSession
-let config = URLSessionConfiguration.default
-config.timeoutIntervalForRequest = 30
-let provider = ZTURLSessionProvider(session: URLSession(configuration: config))
-
-// 创建 API
-let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: provider)
-```
-
-**ZTAlamofireProvider - Alamofire 实现**
-
-```swift
-import Alamofire
-
-// 使用默认 Session
-let provider = ZTAlamofireProvider()
-
-// 使用自定义 Session（可配置 interceptor 等）
-let configuration = Configuration()
-let session = Session(configuration: configuration)
-let provider = ZTAlamofireProvider(session: session)
-```
-
-**ZTStubProvider - 测试 Mock**
-
-```swift
-// JSON 字典 stub
-let stubs: [String: [String: Any]] = [
-    "GET:https://api.example.com/user": ["id": 1, "name": "Jack"],
-    "POST:https://api.example.com/login": ["token": "abc123"]
-]
-
-let provider = ZTStubProvider.jsonStubs(stubs)
-
-// 带延迟和状态码的 stub
-let provider = ZTStubProvider(stubs: [
-    "GET:https://api.example.com/user": .init(
-        statusCode: 200,
-        data: jsonData,
-        delay: 0.5  // 模拟网络延迟
-    )
-])
-```
-
-**ZTSSLPinningProvider - SSL 证书固定**
-
-> 注：SSL Pinning 的实现代码在 Demo 工程的 `ZTAPISecurityPlugin.swift` 和 `ZTAlamofireSecurityExtension.swift` 中。
-
-```swift
-// 证书固定
-let certificates = ZTCertificateLoader.load(from: "myserver") // 从 Bundle 加载 myserver.cer
-let provider = ZTSSLPinningProvider(mode: .certificate(certificates))
-
-let api = ZTAPI(
-    baseURL: "https://api.example.com",
-    provider: provider
-)
-
-// 公钥固定
-let certificates = ZTCertificateLoader.load(from: "myserver")
-let publicKeys = ZTCertificateLoader.publicKeys(from: certificates)
-let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeys))
-
-// 禁用验证（仅开发环境）
-let provider = ZTSSLPinningProvider(mode: .disabled)
-```
-
-**Alamofire SSL Pinning**
-
-```swift
-import Alamofire
-
-// 证书固定
-let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
-let api = ZTAPI(baseURL: "https://api.example.com", provider: provider)
-
-// 公钥固定
-let provider = ZTAlamofireProvider.publicKeyPinning(from: "myserver")
-
-// 禁用验证（仅开发环境）
-let provider = ZTAlamofireProvider.insecureProvider()
-```
-
-**获取服务器证书**
-
-```bash
-# 从服务器导出证书
-openssl s_client -connect api.example.com:443 -showcerts
-
-# 将证书保存为 .cer 或 .der 格式
-# 添加到项目 Bundle 中
-```
-
-### Plugin 插件机制
-
-插件系统通过 `ZTAPIPlugin` 协议实现请求/响应的拦截和增强：
-
-```swift
-/// 插件协议
-protocol ZTAPIPlugin: Sendable {
-    /// 请求即将发送（可修改请求）
-    func willSend(_ request: inout URLRequest) async throws
-
-    /// 收到响应
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
-
-    /// 发生错误
-    func didCatch(_ error: Error) async throws
-
-    /// 处理响应数据（可修改返回数据）
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
-}
-```
-
-#### 示例插件
-
-> 注：以下插件的实现代码在 Demo 工程中，可根据需要复制到项目使用。
-
-| 插件                             | 说明                           |
-| -------------------------------- | ------------------------------ |
-| `ZTLogPlugin`                    | 请求/响应日志输出              |
-| `ZTAuthPlugin`                   | 自动添加认证 Token             |
-| `ZTTokenRefreshPlugin`           | 自动刷新过期 Token（并发安全） |
-| `ZTJSONDecodePlugin`             | JSON 美化输出                  |
-| `ZTDecryptPlugin`                | 响应数据解密                   |
-| `ZTResponseHeaderInjectorPlugin` | 注入响应头到数据中             |
-
-#### 自定义插件示例
-
-```swift
-/// 请求签名插件
-struct ZTSignPlugin: ZTAPIPlugin {
-    let appKey: String
-    let appSecret: String
-
-    func willSend(_ request: inout URLRequest) async throws {
-        guard let url = request.url else { return }
-
-        // 添加时间戳
-        let timestamp = String(Int(Date().timeIntervalSince1970))
-        request.setValue(timestamp, forHTTPHeaderField: "X-Timestamp")
-
-        // 生成签名
-        let sign = "\(appKey)\(timestamp)\(appSecret)".md5
-        request.setValue(sign, forHTTPHeaderField: "X-Sign")
-    }
-}
-
-/// 使用
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTSignPlugin(appKey: "xxx", appSecret: "yyy"))
+// 直接获取数据
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123")
     .response()
+
+// 带参数
+let users: [User] = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users")
+    .params(.kv("page", 1), .kv("size", 20))
+    .response()
+```
+
+POST 请求：
+
+```swift
+// URL 表单编码（默认）
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+    .params(.kv("username", "jack"), .kv("password", "123456"))
+    .response()
+
+// JSON 请求体
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+    .params(.kv("username", "jack"), .kv("password", "123456"))
+    .encoding(ZTJSONEncoding())
+    .response()
+```
+
+---
+
+## 基础用法
+
+### 响应模型
+
+```swift
+struct User: Codable {
+    let id: Int
+    let name: String
+    let email: String
+}
+
+struct LoginResponse: Codable {
+    let token: String
+    let userId: Int
+}
+```
+
+### 常见 HTTP 方法
+
+```swift
+// GET
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+
+// POST
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .post)
+    .params(.kv("name", "Jack"), .kv("email", "jack@example.com"))
+    .response()
+
+// PUT
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .put)
+    .params(.kv("name", "Jack Updated"))
+    .response()
+
+// DELETE
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .delete).response()
+```
+
+### 请求头与超时
+
+```swift
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+    .headers(.h("Authorization", "Bearer token123"), .h("Accept", "application/json"))
+    .timeout(30)
+    .response()
+```
+
+### 原始数据响应
+
+```swift
+// 获取原始 Data
+let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data").send()
+
+// 获取原始 String
+let text = String(decoding: data, as: UTF8.self)
 ```
 
 ### 错误处理
 
-#### ZTAPIError
-
-ZTAPI 使用统一的 `ZTAPIError` 类型处理所有错误：
-
 ```swift
-public struct ZTAPIError: Error {
-    public let code: Int           // 错误码
-    public let msg: String         // 错误信息
-    public private(set) var httpResponse: HTTPURLResponse?  // 关联的 HTTP 响应（只读）
-}
-```
-
-**内置错误定义**（推荐使用）：
-
-```swift
-// 通用错误 80000-80999
-ZTAPIError.invalidURL              // URL 为空
-ZTAPIError.invalidURL(urlStr)      // URL 格式无效
-ZTAPIError.invalidParams           // 请求参数无效
-ZTAPIError.invalidResponse         // 响应类型无效
-ZTAPIError.emptyResponse           // 响应为空
-ZTAPIError.uploadRequiresBody      // 上传需要 httpBody
-
-// JSON 相关错误 81000-81999
-ZTAPIError.invalidJSONObject       // 参数包含非 JSON 可序列化对象
-ZTAPIError.jsonEncodingFailed(msg) // JSON 编码失败
-ZTAPIError.jsonParseFailed(msg)    // JSON 解析失败
-ZTAPIError.invalidResponseFormat   // 响应格式无效
-ZTAPIError.unsupportedPayloadType  // 不支持的 payload 类型
-
-// XPath 相关错误 82000-82999
-ZTAPIError.xpathParseFailed(xpath) // XPath 解析失败
-
-// 文件相关错误 83000-83999
-ZTAPIError.fileReadFailed(path, msg) // 文件读取失败
-```
-
-#### 错误转换规则
-
-| 错误来源 | 转换行为 |
-|---------|---------|
-| NSError 及子类（URLError 等） | 自动转换为 ZTAPIError，提取 code 和 localizedDescription |
-| 已是 ZTAPIError | 直接传递 |
-| 其他自定义 Error 类型 | 原样抛出，需使用 ZTTransferErrorPlugin 自行处理 |
-
-#### 自定义 Provider / Plugin 时的注意事项
-
-**请务必抛出 `ZTAPIError` 类型**，以确保重试策略和错误处理能正常工作：
-
-```swift
-// ✅ 正确：使用内置错误定义
-public func request(...) async throws -> (Data, HTTPURLResponse) {
-    guard let url = request.url else {
-        throw ZTAPIError.invalidURL
-    }
-    // ...
-}
-
-// ✅ 正确：动态参数的错误
-public func request(...) async throws -> (Data, HTTPURLResponse) {
-    guard let url = URL(string: urlStr) else {
-        throw ZTAPIError.invalidURL(urlStr)
-    }
-    // ...
-}
-
-// ❌ 错误：抛出其他类型
-public func request(...) async throws -> (Data, HTTPURLResponse) {
-    guard let url = request.url else {
-        throw MyCustomError()  // 重试策略无法识别
+do {
+    let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+} catch let error as ZTAPIError {
+    print("错误 \(error.code): \(error.msg)")
+    // 根据错误码处理
+    switch error.code {
+    case 401: print("未授权")
+    case 404: print("未找到")
+    default: print("其他错误")
     }
 }
 ```
 
-如果必须使用自定义错误类型，请使用 `ZTTransferErrorPlugin` 进行转换：
+---
 
-```swift
-struct MyError: Error { ... }
+## 进阶用法
 
-let provider = MyProvider()
-let api = ZTAPI<ZTAPIKVParam>("...", .get, provider: provider)
-    .plugins(ZTTransferErrorPlugin { error in
-        // 将自定义错误转换为 ZTAPIError
-        if let myError = error as? MyError {
-            return ZTAPIError(myError.code, myError.message)
-        }
-        return error
-    })
-```
+### 1. @ZTAPIParam 宏 - 类型安全参数
 
-## 核心用法
-
-### 1. @ZTAPIParam 宏 - 极简参数定义
-
-使用 `@ZTAPIParam` 宏，只需声明 case 即可自动生成参数代码（需 ZTJSON 支持）：
+使用 `@ZTAPIParam` 宏（需要 ZTJSON）生成类型安全参数，自动映射 key：
 
 ```swift
 #if canImport(ZTJSON)
-import ZTAPI
 import ZTJSON
 
 enum UserCenterAPI {
     static var baseUrl: String { "https://api.example.com" }
-    static var provider: any ZTAPIProvider { ZTURLSessionProvider() }
 
     // 宏自动生成：key、value、isValid
-    // 自动转换：userName → user_name
+    // 自动转换：userName → user_name（驼峰转下划线）
     @ZTAPIParam
     enum UserAPIParam {
-        case userName(String)
-        case password(String)
-        // Optional 参数：该参数可选，不参与 isValid 校验
-        case email(String?)
+        case userName(String)      // → "user_name"（必填）
+        case password(String)      // → "password"（必填）
+        // 可选参数：该参数为可选，不参与 isValid 校验
+        case email(String?)        // → "email"（可选）
         // 自定义参数名：userId → "uid"
         @ZTAPIParamKey("uid")
-        case userId(String)
+        case userId(String)        // → "uid"（必填）
     }
 
-    // 使用
+    // 使用示例
     static func login(userName: String, password: String, email: String? = nil) async throws -> LoginResponse {
-        var api = ZTAPI<UserAPIParam>(baseUrl + "/user/login", .post, provider: provider)
+        var api = ZTAPI<UserAPIParam>(baseUrl + "/user/login", .post)
             .params(.userName(userName), .password(password))
-        // email 参数可选，nil 时不会被添加到请求中
+        // email 参数为可选，nil 时不会添加到请求中
         if let email = email {
             api = api.params(.email(email))
         }
@@ -385,65 +215,78 @@ enum UserAPIParam: ZTAPIParamProtocol {
 
     // 非 Optional 参数必须存在
     static func isValid(_ params: [String: Sendable]) -> Bool {
-        params["user_name"] != nil && params["password"] != nil && params["uid"] != nil
+        return params["user_name"] != nil && params["password"] != nil && params["uid"] != nil
     }
 }
 ```
 
 ### 2. 模块化 API 封装
 
-完整示例展示模块化封装的威力（如果使用@ZTAPIParam则需 ZTJSON 支持）：
+用 enum 组织 API 模块。推荐模式 - 内部定义端点，返回 `ZTAPI` 实例支持链式调用和 Combine：
 
 ```swift
-#if canImport(ZTJSON)
-import ZTJSON
-
 enum UserCenterAPI {
-    static var baseUrl: String { "https://api.example.com" }
-    static var provider: any ZTAPIProvider { ZTURLSessionProvider() }
+    // 内部定义端点
+    enum API {
+        case custom(url: String, method: ZTHTTPMethod)
 
-    @ZTAPIParam
-    enum UserAPIParam {
-        case userName(String)
-        case password(String)
-        case userId(String)
+        static var baseUrl: String { "https://api.example.com" }
+        static var provider: any ZTAPIProvider { ZTURLSessionProvider() }
+
+        var url: String {
+            switch self {
+            case .custom(let url, _): return url
+            }
+        }
+
+        var method: ZTHTTPMethod {
+            switch self {
+            case .custom(_, let method): return method
+            }
+        }
+
+        // 使用 build() 统一配置
+        fileprivate func build<P: ZTAPIParamProtocol>() -> ZTAPI<P> {
+            ZTAPI<P>(API.baseUrl + url, method, provider: API.provider)
+                .encoding(ZTJSONEncoding())
+                .timeout(30)
+                .plugins(
+                    ZTAuthPlugin { "TOKEN" },
+                    ZTLogPlugin(level: .simple)
+                )
+        }
+
+        static var login = API.custom(url: "/user/login", method: .post)
+        static var userInfo = API.custom(url: "/user/info", method: .get)
+        static var userList = API.custom(url: "/users", method: .get)
     }
 
-    private static func makeApi<P: ZTAPIParamProtocol>(
-        _ path: String, _ method: ZTHTTPMethod = .get
-    ) -> ZTAPI<P> {
-        ZTAPI<P>(baseUrl + path, method, provider: provider)
-    }
-
-    // 登录 - 直接返回数据
-    static func login(userName: String, password: String) async throws -> LoginResponse {
-        try await makeApi("/user/login", .post)
+    // 登录 - 返回 ZTAPI 实例支持链式调用
+    static func login(userName: String, password: String) -> ZTAPI<UserAPIParam> {
+        API.login.build()
             .params(.userName(userName), .password(password))
-            .response()
     }
 
-    // 获取用户信息 - 直接返回数据
-    static func userInfo(userId: String) async throws -> UserInfoResponse {
-        try await makeApi("/user/info")
+    // 获取用户信息
+    static func userInfo(userId: String) -> ZTAPI<UserAPIParam> {
+        API.userInfo.build()
             .params(.userId(userId))
-            .response()
     }
 
-    // 用户列表 - 直接返回数据
-    static func userList() async throws -> [User] {
-        try await makeApi("/users").response()
+    // 用户列表 - 返回 ZTAPI 实例
+    static var userList: ZTAPI<ZTAPIKVParam> {
+        API.userList.build()
     }
 }
 
-// 使用 - 直接获取数据
-let response = try await UserCenterAPI.login(userName: "jack", password: "123456")
-let users: [User] = try await UserCenterAPI.userList()
-#endif
+// 使用 - 调用 .response() 获取数据
+let response: LoginResponse = try await UserCenterAPI.login(userName: "jack", password: "123456").response()
+let users: [User] = try await UserCenterAPI.userList.response()
 ```
 
 ### 3. XPath 解析
 
-直接将 JSON 嵌套路径映射到模型属性，无需定义嵌套结构：
+解析 JSON 嵌套字段，无需定义嵌套结构（需要 ZTJSON）：
 
 ```swift
 #if canImport(ZTJSON)
@@ -454,11 +297,10 @@ struct User {
     let id: Int
     let name: String
 
-    // XPath：address/city → city
+    // 直接映射嵌套路径
     @ZTJSONKey("address/city")
     var city: String = ""
 
-    // XPath：address/geo/lat → lat
     @ZTJSONKey("address/geo/lat")
     var lat: Double = 0
 
@@ -466,29 +308,28 @@ struct User {
     var lng: Double = 0
 }
 
-// JSON 响应：
-// { "id": 1, "name": "Jack", "address": { "city": "Beijing", "geo": { "lat": 39.9, "lng": 116.4 } } }
+// JSON: { "id": 1, "name": "Jack", "address": { "city": "Beijing", "geo": { "lat": 39.9, "lng": 116.4 } } }
 // 无需定义 Address、Geo 嵌套模型！
+
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1").response()
 #endif
 ```
 
 ### 4. 运行时 XPath 解析
 
-> 适用场景：当只需要 JSON 中少量嵌套字段时，使用运行时解析可避免为每个字段定义完整模型，降低 model 膨胀速度。
+运行时解析多个 XPath 路径，无需定义模型：
 
 ```swift
 #if canImport(ZTJSON)
-// 同时解析多个 XPath 路径
 let results = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
     .parseResponse(
-        // isAllowMissing: true（默认）字段不存在时不报错，返回 nil
+        // isAllowMissing: true（默认）- 字段不存在时不报错，返回 nil
         ZTAPIParseConfig("/data/user/name", type: String.self),
-        // isAllowMissing: false 字段不存在时抛出异常
+        // isAllowMissing: false - 字段不存在时抛出异常
         ZTAPIParseConfig("/data/user/age", type: Int.self, false),
         ZTAPIParseConfig("/data/posts", type: [Post].self)
     )
 
-// 获取解析结果
 if let name = results["/data/user/name"] as? String {
     print("用户名: \(name)")
 }
@@ -501,171 +342,231 @@ if let posts = results["/data/posts"] as? [Post] {
 #endif
 ```
 
-### 5. 插件使用
-
-> 注：以下插件的实现代码在 Demo 工程中，可根据需要复制到项目使用。
-
-#### 日志插件
+### 5. 文件上传
 
 ```swift
-// 详细日志
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTLogPlugin(level: .verbose))
-    .response()
-
-// 简洁日志
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTLogPlugin(level: .simple))
-    .response()
-```
-
-#### 认证插件
-
-```swift
-// 静态 Token
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/protected")
-    .plugins(ZTAuthPlugin(token: { "my-token" }))
-    .response()
-
-// 动态 Token（从本地存储读取）
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/protected")
-    .plugins(ZTAuthPlugin(token: { Keychain.loadToken() }))
-    .response()
-```
-
-#### Token 刷新插件（并发安全）
-
-```swift
-// 自动刷新过期 Token，使用 Actor 确保并发安全
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTTokenRefreshPlugin(
-        shouldRefresh: { error in
-            // 判断是否需要刷新 Token
-            (error as? ZTAPIError)?.code == 401
-        },
-        refresh: {
-            // 执行刷新逻辑
-            let newToken = try await APIService.refreshToken()
-            return newToken
-        },
-        onRefresh: { newToken in
-            // 刷新成功后的回调
-            Keychain.saveToken(newToken)
-        },
-        useSingleFlight: true  // 启用 single-flight 模式，防止并发刷新
-    ))
-    .response()
-```
-
-#### 响应处理插件
-
-```swift
-// JSON 美化
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTJSONDecodePlugin())
-    .response()
-
-// 数据解密
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/encrypted")
-    .plugins(ZTDecryptPlugin(decrypt: { data in
-        try CryptoHelper.decrypt(data)
-    }))
-    .response()
-
-// 注入响应头
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .plugins(ZTResponseHeaderInjectorPlugin())
-    .response()
-```
-
-### 6. 文件上传
-
-```swift
-// 上传单个文件
+// 上传单个 Data
 let imageData = try Data(contentsOf: imageURL)
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
     .upload(.data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg))
     .uploadProgress { progress in
-        print("上传进度: \(progress.fractionCompleted * 100)%")
+        print("进度: \(progress.fractionCompleted * 100)%")
     }
     .response()
 
-// 多文件混合上传
+// 上传单个文件
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+    .upload(.file(fileURL, name: "file", mimeType: .txt))
+    .response()
+
+// 多文件混合上传（Data + File）
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multiple", .post)
     .upload(
         .data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg),
         .file(fileURL, name: "document", mimeType: .pdf)
     )
     .params(.kv("userId", "123"))
     .response()
+
+// 使用 Multipart 上传文件 + 表单字段
+let formData = ZTMultipartFormData()
+    .add(.data(Data("file1".utf8), name: "files", fileName: "file1.txt", mimeType: .txt))
+    .add(.data(Data("file2".utf8), name: "files", fileName: "file2.txt", mimeType: .txt))
+    .add(.data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
+
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multipart", .post)
+    .multipart(formData)
+    .response()
+
+// 原始 body 上传
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/raw", .post)
+    .body(Data("raw body data".utf8))
+    .headers(.h("Content-Type", ZTMimeType.octetStream.rawValue))
+    .response()
+
+// 自定义 MIME 类型
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+    .upload(.data(Data("custom data".utf8), name: "file", mimeType: .custom(ext: "", mime: "application/vnd.example")))
+    .response()
 ```
 
-### 7. 重试策略
+---
+
+## 高级特性
+
+### Provider 架构
+
+ZTAPI 通过 `ZTAPIProvider` 协议抽象底层网络实现，支持多种 Provider：
+
+> 注：Provider 实现代码在 Demo 工程中，按需复制使用。
+
+| Provider               | 说明                   | 依赖      |
+| ---------------------- | ---------------------- | --------- |
+| `ZTURLSessionProvider` | 原生 URLSession        | 无        |
+| `ZTAlamofireProvider`  | 基于 Alamofire         | Alamofire |
+| `ZTStubProvider`       | 单元测试 Mock          | 无        |
+| `ZTSSLPinningProvider` | SSL 证书固定（URLSession） | 无     |
 
 ```swift
-// 固定次数重试
+// 使用 shared 单例
+let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZTURLSessionProvider.shared)
+
+// 或使用 Alamofire
+let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZTAlamofireProvider.shared)
+```
+
+### Plugin 插件系统
+
+插件系统提供 4 个钩子拦截请求/响应：
+
+```swift
+protocol ZTAPIPlugin: Sendable {
+    func willSend(_ request: inout URLRequest) async throws
+    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
+    func didCatch(_ error: Error) async throws
+    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
+}
+```
+
+> 注：插件实现在 Demo 工程中。
+
+**内置插件：**
+
+| 插件              | 说明               |
+| ----------------- | ------------------ |
+| `ZTLogPlugin`     | 请求/响应日志      |
+| `ZTAuthPlugin`    | 自动添加认证 Token |
+| `ZTTokenRefreshPlugin` | 自动刷新过期 Token |
+| `ZTJSONDecodePlugin`   | JSON 美化输出  |
+| `ZTDecryptPlugin` | 响应数据解密       |
+| `ZTCheckRespOKPlugin` | 检查业务状态码 |
+| `ZTReadPayloadPlugin` | 提取响应 data 字段 |
+
+```swift
+// 使用插件
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+    .plugins(ZTLogPlugin(), ZTAuthPlugin { "my-token" })
+    .response()
+```
+
+**自定义插件示例：**
+
+```swift
+struct RequestSignPlugin: ZTAPIPlugin {
+    let appKey: String
+    let appSecret: String
+
+    func willSend(_ request: inout URLRequest) async throws {
+        let timestamp = String(Int(Date().timeIntervalSince1970))
+        request.setValue(timestamp, forHTTPHeaderField: "X-Timestamp")
+        let sign = "\(appKey)\(timestamp)\(appSecret)".md5
+        request.setValue(sign, forHTTPHeaderField: "X-Sign")
+    }
+}
+```
+
+### 重试策略
+
+| 策略                              | 说明           |
+| --------------------------------- | -------------- |
+| `ZTFixedRetryPolicy`              | 固定延迟重试   |
+| `ZTExponentialBackoffRetryPolicy` | 指数退避重试   |
+| `ZTConditionalRetryPolicy`        | 自定义条件重试 |
+
+```swift
+// 固定延迟重试
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
     .retry(ZTFixedRetryPolicy(maxAttempts: 3, delay: 1.0))
     .response()
 
-// 指数退避重试
+// 指数退避
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
-    .retry(ZTExponentialBackoffRetryPolicy(
-        maxAttempts: 5,
-        baseDelay: 1.0,
-        multiplier: 2.0
-    ))
+    .retry(ZTExponentialBackoffRetryPolicy(maxAttempts: 5, baseDelay: 1.0, multiplier: 2.0))
     .response()
 
-// 自定义条件重试
+// 自定义条件重试（async 闭包）
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom")
     .retry(ZTConditionalRetryPolicy(maxAttempts: 3, delay: 2.0) {
         request, error, attempt, response in
         // 只在 5xx 错误时重试
-        if let statusCode = response?.statusCode {
-            return statusCode >= 500
-        }
-        return true
+        (response?.statusCode ?? 0) >= 500
     })
     .response()
 ```
 
-### 8. 并发控制
+### SSL Pinning
+
+> SSL Pinning 实现在 Demo 工程的 `ZTAPISecurityPlugin.swift` 中。
+
+**URLSession SSL Pinning：**
 
 ```swift
-// 全局并发数限制
-ZTGlobalAPIProvider.configure(
-    ZTURLSessionProvider(),
+// 证书固定
+let certificates = ZTCertificateLoader.load(from: "myserver")
+let provider = ZTSSLPinningProvider(mode: .certificate(certificates))
+
+// 公钥固定
+let certificates = ZTCertificateLoader.load(from: "myserver")
+let publicKeys = ZTCertificateLoader.publicKeys(from: certificates)
+let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeys))
+
+// 禁用验证（仅开发环境）
+let provider = ZTSSLPinningProvider(mode: .disabled)
+```
+
+**Alamofire SSL Pinning：**
+
+```swift
+import Alamofire
+
+// 从 Bundle 加载证书固定
+let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
+
+// 从 Bundle 加载公钥固定
+let provider = ZTAlamofireProvider.publicKeyPinning(from: "myserver")
+
+// 禁用验证（仅开发环境）
+let provider = ZTAlamofireProvider.insecureProvider()
+```
+
+导出服务器证书：
+```bash
+openssl s_client -connect api.example.com:443 -showcerts
+```
+
+### 并发控制
+
+```swift
+// 配置全局 Provider
+await ZTGlobalAPIProviderStore.shared.configure(
+    baseProvider: ZTURLSessionProvider(),
     maxConcurrency: 6
 )
 
-// 动态调整
-ZTGlobalAPIProvider.shared.setMaxConcurrency(10)
+// 获取全局 Provider
+let globalProvider = await ZTGlobalAPIProviderStore.shared.get()
+
+// 读取当前并发限制
+let currentMax = await globalProvider.currentMaxConcurrency
+
+// 修改并发限制
+await globalProvider.setMaxConcurrency(10)
 
 // 使用全局 Provider
 let result = try await ZTAPI<ZTAPIKVParam>.global("https://api.example.com/data")
     .response()
 ```
 
-### 9. Combine 支持
+### Combine 支持
 
 ```swift
 import Combine
 
-// 需要返回 ZTAPI 实例而非直接返回数据
 enum UserCenterAPI {
-    static var baseUrl: String { "https://api.example.com" }
-    static var provider: any ZTAPIProvider { ZTURLSessionProvider() }
-
-    @ZTAPIParam
-    enum UserAPIParam {
-        case userId(String)
-    }
-
-    // 返回 ZTAPI 实例，支持链式调用
-    static func userInfo(userId: String) -> ZTAPI<UserAPIParam> {
-        ZTAPI<UserAPIParam>(baseUrl + "/user/info", .get, provider: provider)
-            .params(.userId(userId))
+    // 返回 ZTAPI 实例用于链式调用
+    static func userInfo(userId: String) -> ZTAPI<ZTAPIKVParam> {
+        ZTAPI<ZTAPIKVParam>("https://api.example.com/user/info")
+            .params(.kv("userId", userId))
     }
 }
 
@@ -686,150 +587,79 @@ cancellable = publisher
     )
 ```
 
-## 完整示例：订单模块
+---
+
+## 错误参考
+
+### ZTAPIError 结构
 
 ```swift
-#if canImport(ZTJSON)
-import ZTJSON
-
-enum OrderAPI {
-    static var baseUrl: String { "https://api.example.com" }
-    static var provider: any ZTAPIProvider { ZTURLSessionProvider() }
-
-    @ZTAPIParam
-    enum OrderParam {
-        case orderId(String)
-        case productId(String)
-        case quantity(Int)
-        case addressId(String)
-        case status(OrderStatus)
-        case startDate(Date)
-        case endDate(Date)
-        case page(Int)
-        case pageSize(Int)
-    }
-
-    private static func makeApi<P: ZTAPIParamProtocol>(
-        _ path: String, _ method: ZTHTTPMethod = .get
-    ) -> ZTAPI<P> {
-        ZTAPI<P>(baseUrl + path, method, provider: provider)
-    }
-
-    // 创建订单 - POST 使用 JSONEncoding
-    static func create(
-        productId: String, quantity: Int, addressId: String
-    ) async throws -> OrderDetail {
-        try await makeApi("/orders", .post)
-            .params(.productId(productId), .quantity(quantity), .addressId(addressId))
-            .encoding(ZTJSONEncoding())  // POST 请求使用 JSON 编码
-            .response()
-    }
-
-    // 订单列表（带筛选）- 直接返回数据
-    static func list(
-        status: OrderStatus? = nil,
-        startDate: Date? = nil,
-        endDate: Date? = nil,
-        page: Int = 1
-    ) async throws -> OrderListResponse {
-        var api = makeApi("/orders")
-            .params(.page(page), .pageSize(20))
-        if let status = status { api = api.params(.status(status)) }
-        if let start = startDate { api = api.params(.startDate(start)) }
-        if let end = endDate { api = api.params(.endDate(end)) }
-        return try await api.response()
-    }
-
-    // 订单详情 - 直接返回数据
-    static func detail(orderId: String) async throws -> OrderDetail {
-        try await makeApi("/orders/\(orderId)").response()
-    }
-
-    // 取消订单 - 直接返回数据
-    static func cancel(orderId: String) async throws -> EmptyResponse {
-        try await makeApi("/orders/\(orderId)/cancel", .post).response()
-    }
+public struct ZTAPIError: Error {
+    public let code: Int           // 错误码
+    public let msg: String         // 错误信息
+    public let httpResponse: HTTPURLResponse?  // 关联的 HTTP 响应
 }
-
-// 使用 - 直接获取数据
-let orders: OrderListResponse = try await OrderAPI.list(
-    status: .paid,
-    page: 1
-)
-
-let order: OrderDetail = try await OrderAPI.detail(orderId: "123")
-#endif
 ```
+
+### 内置错误
+
+| 错误                 | 错误码 | 说明                |
+| -------------------- | ------ | ------------------- |
+| `invalidURL`         | 80001  | URL 为空            |
+| `invalidParams`      | 80002  | 请求参数无效        |
+| `invalidResponse`    | 80003  | 响应类型无效        |
+| `emptyResponse`      | 80004  | 响应为空            |
+| `jsonEncodingFailed` | 81002  | JSON 编码失败       |
+| `jsonParseFailed`    | 81003  | JSON 解析失败       |
+| `xpathParseFailed`   | 82001  | XPath 解析失败      |
+
+---
 
 ## API 参考
 
-### Provider
-
-| Provider                   | 说明                       | 依赖      |
-| -------------------------- | -------------------------- | --------- |
-| `ZTURLSessionProvider`     | 基于 URLSession 的原生实现 | 无        |
-| `ZTAlamofireProvider`      | 基于 Alamofire 的实现      | Alamofire |
-| `ZTStubProvider`           | 用于测试的 Mock Provider   | 无        |
-| `ZTSSLPinningProvider`     | SSL 证书固定（URLSession） | 无        |
-
-**SSL Pinning 组件：**
-| 类                         | 说明                   |
-| -------------------------- | ---------------------- |
-| `ZTSSLPinningMode`        | Pinning 模式枚举（certificate/publicKey/disabled） |
-| `ZTCertificateLoader`     | 证书加载工具           |
-| `ZTSSLPinningValidator`   | 证书验证逻辑           |
-
-### Plugin
-
-> 注：以下插件的实现代码在 Demo 工程中，可根据需要复制到项目使用。
-
-| 插件                             | 说明                           |
-| -------------------------------- | ------------------------------ |
-| `ZTLogPlugin`                    | 请求/响应日志输出              |
-| `ZTAuthPlugin`                   | 自动添加认证 Token             |
-| `ZTTokenRefreshPlugin`           | 自动刷新过期 Token（并发安全） |
-| `ZTJSONDecodePlugin`             | JSON 美化输出                  |
-| `ZTDecryptPlugin`                | 响应数据解密                   |
-| `ZTResponseHeaderInjectorPlugin` | 注入响应头到数据中             |
-
 ### ZTAPI 方法
 
-| 方法                 | 说明                              |
-| -------------------- | --------------------------------- |
-| `params(_:)`         | 添加请求参数                      |
-| `headers(_:)`        | 添加 HTTP 头                      |
-| `encoding(_:)`       | 设置参数编码                      |
-| `body(_:)`           | 设置原始请求体                    |
-| `upload(_:)`         | 上传文件/Data                     |
-| `multipart(_:)`      | 设置 Multipart 表单               |
-| `timeout(_:)`        | 设置超时时间                      |
-| `retry(_:)`          | 设置重试策略                      |
-| `uploadProgress(_:)` | 设置上传进度回调                  |
-| `jsonDecoder(_:)`    | 配置 JSON 解码器                  |
-| `plugins(_:)`        | 添加插件                          |
-| `send()`             | 发送请求，返回 Data               |
-| `response()`         | 发送请求，返回 Codable 对象       |
-| `parseResponse(_:)`  | 发送请求，XPath 解析（需 ZTJSON） |
-| `publisher()`        | 返回 Combine Publisher            |
-| `global(_:_:)`       | 使用全局 Provider 创建实例        |
+| 方法                | 说明                         |
+| ------------------- | ---------------------------- |
+| `params(_:)`        | 添加请求参数                 |
+| `headers(_:)`       | 添加 HTTP 头                 |
+| `encoding(_:)`      | 设置参数编码（URL/JSON/Multipart） |
+| `body(_:)`          | 设置原始请求体               |
+| `upload(_:)`        | 上传文件/Data                |
+| `timeout(_:)`       | 设置超时                     |
+| `retry(_:)`         | 设置重试策略                 |
+| `uploadProgress(_:)` | 设置上传进度回调             |
+| `jsonDecoder(_:)`   | 配置 JSON 解码器             |
+| `plugins(_:)`       | 添加插件                     |
+| `send()`            | 发送请求，返回 Data          |
+| `response()`        | 发送请求，返回 Codable 对象  |
+| `parseResponse(_:)` | 发送请求，XPath 解析（需 ZTJSON） |
+| `publisher()`       | 返回 Combine Publisher       |
 
-### 重试策略
+### HTTP 方法
 
-| 策略                              | 说明           |
-| --------------------------------- | -------------- |
-| `ZTFixedRetryPolicy`              | 固定延迟重试   |
-| `ZTExponentialBackoffRetryPolicy` | 指数退避重试   |
-| `ZTConditionalRetryPolicy`        | 自定义条件重试 |
+```swift
+public enum ZTHTTPMethod: Sendable {
+    case get
+    case post
+    case put
+    case patch
+    case delete
+    case head
+}
+```
 
 ### 参数编码
 
-| 编码                  | 说明                                   |
-| --------------------- | -------------------------------------- |
-| `ZTURLEncoding`       | URL 编码，默认编码，GET/POST 均适用    |
-| `ZTJSONEncoding`      | JSON 编码，POST 请求常用                |
-| `ZTMultipartEncoding` | Multipart 表单编码，文件上传使用        |
+| 编码                  | 说明                            |
+| --------------------- | ------------------------------- |
+| `ZTURLEncoding`       | URL 编码，默认                  |
+| `ZTJSONEncoding`      | JSON 编码，POST 请求常用        |
+| `ZTMultipartEncoding` | Multipart 表单编码，文件上传使用 |
 
-> 提示：POST 请求默认使用 `ZTURLEncoding`，如需发送 JSON 格式需显式指定 `.encoding(ZTJSONEncoding())`
+> 提示：POST 请求默认使用 `ZTURLEncoding`，发送 JSON 请求体需显式指定 `.encoding(ZTJSONEncoding())`
+
+---
 
 ## 系统要求
 
@@ -839,18 +669,16 @@ let order: OrderDetail = try await OrderAPI.detail(orderId: "123")
 
 ## 可选依赖
 
-| 库            | 用途                                              |
-| ------------- | ------------------------------------------------- |
-| **Alamofire** | 使用 `ZTAlamofireProvider`                        |
-| **ZTJSON**    | `@ZTAPIParam` 宏、XPath 解析、`parseResponse(_:)` |
+| 库            | 用途                      |
+| ------------- | ------------------------- |
+| **Alamofire** | 使用 `ZTAlamofireProvider` |
+| **ZTJSON**    | `@ZTAPIParam` 宏、XPath 解析 |
 
-> 注：
-> - 内置 Plugin（`ZTLogPlugin`、`ZTAuthPlugin` 等）的实现代码在 Demo 工程中，可根据需要复制到项目使用。
-> - `ZTURLSessionProvider`、`ZTAlamofireProvider`、`ZTStubProvider` 的实现代码同样在 Demo 工程中，可根据需要复制到项目使用。
+> 注：内置 Plugin 和 Provider 的实现代码在 Demo 工程中，按需复制使用。
 
 ## 许可证
 
-GNU AGPL v3
+AGPL v3 License
 
 ## 作者
 
