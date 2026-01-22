@@ -15,6 +15,8 @@
 		7B5A0E662D9BCF06007AEC15 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7B5A0E5E2D9BCF06007AEC15 /* LaunchScreen.storyboard */; };
 		7BA3BDB92F15DC310037DC68 /* ZTJSON in Frameworks */ = {isa = PBXBuildFile; productRef = 7BA3BDB82F15DC310037DC68 /* ZTJSON */; };
 		7BA3BE0C2F166FCE0037DC68 /* VM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA3BE0B2F166FCB0037DC68 /* VM.swift */; };
+		7BAF137C2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */; };
+		7BAF137D2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */; };
 		97046CB72F16A7F30050B940 /* ZTAPIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97046CB42F16A7F20050B940 /* ZTAPIProvider.swift */; };
 		97046CB82F16A7F30050B940 /* ZTAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97046CB32F16A7F20050B940 /* ZTAPI.swift */; };
 		97046CBB2F16A8520050B940 /* ZTJSON in Frameworks */ = {isa = PBXBuildFile; productRef = 97046CBA2F16A8520050B940 /* ZTJSON */; };
@@ -34,6 +36,8 @@
 		7B5A0E5D2D9BCF06007AEC15 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		7B5A0E5F2D9BCF06007AEC15 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		7BA3BE0B2F166FCB0037DC68 /* VM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VM.swift; sourceTree = "<group>"; };
+		7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAlamofireSecurityExtension.swift; sourceTree = "<group>"; };
+		7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPISecurityPlugin.swift; sourceTree = "<group>"; };
 		97046CB32F16A7F20050B940 /* ZTAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPI.swift; sourceTree = "<group>"; };
 		97046CB42F16A7F20050B940 /* ZTAPIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIProvider.swift; sourceTree = "<group>"; };
 		973C2C102F17EC1600043196 /* ZTAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPITests.swift; sourceTree = "<group>"; };
@@ -77,6 +81,8 @@
 		7B5A0E602D9BCF06007AEC15 /* JsonDemo */ = {
 			isa = PBXGroup;
 			children = (
+				7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */,
+				7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */,
 				973C2C102F17EC1600043196 /* ZTAPITests.swift */,
 				7B5A0E592D9BCF06007AEC15 /* Model.swift */,
 				974596C82F1FCDD3008FB437 /* ZTAPIPlugin.swift */,
@@ -195,6 +201,8 @@
 				973C2C112F17EC1600043196 /* ZTAPITests.swift in Sources */,
 				7B5A0E612D9BCF06007AEC15 /* Model.swift in Sources */,
 				7B5A0E622D9BCF06007AEC15 /* AppDelegate.swift in Sources */,
+				7BAF137C2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift in Sources */,
+				7BAF137D2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift in Sources */,
 				7BA3BE0C2F166FCE0037DC68 /* VM.swift in Sources */,
 				7B5A0E632D9BCF06007AEC15 /* ViewController.swift in Sources */,
 				97F7FF032F19391F00DDFDAD /* ZTAPIConcurrency.swift in Sources */,
@@ -236,6 +244,7 @@
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 13;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -267,6 +276,7 @@
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 13;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

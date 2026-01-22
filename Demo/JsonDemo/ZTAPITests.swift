@@ -1,9 +1,23 @@
 //
 //  ZTAPITests.swift
-//  JsonDemo
+//  ZTAPI
 //
-//  Created by zt
-//  ZTAPI 网络请求类测试用例
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
@@ -61,19 +75,16 @@ struct TestUser: Codable, Sendable {
     let name: String
 }
 
-/// ZTAPI 测试类
+/// ZTAPI test class
 @MainActor
 class ZTAPITests {
-
-    private let logger = Logger(subsystem: "com.zt.JsonDemo", category: "ZTAPITests")
-
-    // MARK: - 测试结果统计
+    // MARK: - Test Results Statistics
 
     private(set) var passedCount = 0
     private(set) var failedCount = 0
     private(set) var testResults: [String] = []
 
-    // MARK: - 辅助方法
+    // MARK: - Helper Methods
 
     private func log(_ message: String) {
         let logMessage = "[ZTAPI-TEST]: \(message)"
@@ -85,20 +96,20 @@ class ZTAPITests {
     private func assertEqual<T: Equatable>(_ lhs: T, _ rhs: T, file: String = #file, line: Int = #line) {
         if lhs == rhs {
             passedCount += 1
-            log("  ✅ 断言通过: \(lhs) == \(rhs)")
+            log("  ✅ Assertion passed: \(lhs) == \(rhs)")
         } else {
             failedCount += 1
-            log("  ❌ 断言失败: \(lhs) != \(rhs) (\(file):\(line))")
+            log("  ❌ Assertion failed: \(lhs) != \(rhs) (\(file):\(line))")
         }
     }
 
     private func assertTrue(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
         if condition {
             passedCount += 1
-            log("  ✅ 断言通过: \(message.isEmpty ? "true" : message)")
+            log("  ✅ Assertion passed: \(message.isEmpty ? "true" : message)")
         } else {
             failedCount += 1
-            log("  ❌ 断言失败: \(message) (\(file):\(line))")
+            log("  ❌ Assertion failed: \(message) (\(file):\(line))")
         }
     }
 
@@ -106,10 +117,10 @@ class ZTAPITests {
         do {
             _ = try await block()
             failedCount += 1
-            log("  ❌ 断言失败: 期望抛出错误但没有 (\(file):\(line))")
+            log("  ❌ Assertion failed: expected error but got none (\(file):\(line))")
         } catch {
             passedCount += 1
-            log("  ✅ 断言通过: 正确抛出错误 - \(error)")
+            log("  ✅ Assertion passed: correctly threw error - \(error)")
         }
     }
 
@@ -119,13 +130,13 @@ class ZTAPITests {
             try await test()
         } catch {
             failedCount += 1
-            log("  ❌ 测试异常: \(error)")
+            log("  ❌ Test exception: \(error)")
         }
     }
 
-    // MARK: - 测试用例
+    // MARK: - Test Cases
 
-    /// 测试 ZTAPIError 描述
+    /// Test ZTAPIError description
     func testZTAPIErrorDescription() {
         log("\n========== testZTAPIErrorDescription ==========")
         let error = ZTAPIError(404, "Not Found")
@@ -134,7 +145,7 @@ class ZTAPITests {
         assertEqual(error.msg, "Not Found")
     }
 
-    /// 测试 ZTURLEncoding - GET 请求
+    /// Test ZTURLEncoding - GET request
     func testZTURLEncodingGET() {
         log("\n========== testZTURLEncodingGET ==========")
         let encoding = ZTURLEncoding(.queryString)
@@ -145,17 +156,17 @@ class ZTAPITests {
 
         assertTrue(
             request.url?.absoluteString.contains("page=1") == true,
-            "URL 应包含 page=1"
+            "URL should contain page=1"
         )
         assertTrue(
             request.url?.absoluteString.contains("limit=10") == true,
-            "URL 应包含 limit=10"
+            "URL should contain limit=10"
         )
 
-        log("  编码后 URL: \(request.url?.absoluteString ?? "nil")")
+        log("  Encoded URL: \(request.url?.absoluteString ?? "nil")")
     }
 
-    /// 测试 ZTURLEncoding - POST 请求
+    /// Test ZTURLEncoding - POST request
     func testZTURLEncodingPOST() {
         log("\n========== testZTURLEncodingPOST ==========")
         let encoding = ZTURLEncoding(.httpBody)
@@ -167,17 +178,17 @@ class ZTAPITests {
         let bodyString = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
         assertTrue(
             bodyString.contains("name=John") == true,
-            "Body 应包含 name=John"
+            "Body should contain name=John"
         )
         assertEqual(
             request.value(forHTTPHeaderField: "Content-Type"),
             "application/x-www-form-urlencoded"
         )
 
-        log("  编码后 Body: \(bodyString)")
+        log("  Encoded Body: \(bodyString)")
     }
 
-    /// 测试 ZTJSONEncoding
+    /// Test ZTJSONEncoding
     func testZTJSONEncoding() {
         log("\n========== testZTJSONEncoding ==========")
         let encoding = ZTJSONEncoding()
@@ -196,30 +207,30 @@ class ZTAPITests {
            let json = try? JSON(data: body) {
             assertEqual(json["name"].stringValue, "John")
             assertEqual(json["age"].intValue, 30)
-            log("  编码后 JSON: \(json)")
+            log("  Encoded JSON: \(json)")
         } else {
             failedCount += 1
-            log("  ❌ JSON 编码失败")
+            log("  ❌ JSON encoding failed")
         }
     }
 
-    /// 测试 ZTAPIParseConfig
+    /// Test ZTAPIParseConfig
     func testZTAPIParseConfig() {
         log("\n========== testZTAPIParseConfig ==========")
         let config1 = ZTAPIParseConfig("data/user", type: String.self)
         assertEqual(config1.xpath, "data/user")
-        assertTrue(config1.isAllowMissing == true, "默认允许缺失")
+        assertTrue(config1.isAllowMissing == true, "Default allow missing")
 
         let config2 = ZTAPIParseConfig("data/token", type: String.self, false)
         assertEqual(config2.xpath, "data/token")
-        assertTrue(config2.isAllowMissing == false, "不允许缺失")
+        assertTrue(config2.isAllowMissing == false, "Not allow missing")
 
-        // 测试 Hashable
+        // Test Hashable
         let config3 = ZTAPIParseConfig("data/user", type: Int.self)
-        assertTrue(config1 == config3, "相同 xpath 应该相等")
+        assertTrue(config1 == config3, "Same xpath should be equal")
     }
 
-    /// 测试 ZTAPI 链式调用构建
+    /// Test ZTAPI chaining call construction
     func testZTAPIChaining() {
         log("\n========== testZTAPIChaining ==========")
         let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/users", provider: ZTAlamofireProvider.shared)
@@ -235,7 +246,7 @@ class ZTAPITests {
         assertEqual(api.headers["Authorization"], "Bearer token")
     }
 
-    /// 测试 ZTAPI 使用 XPath 解析
+    /// Test ZTAPI with XPath parsing
     func testZTAPIXPathParsing() async {
         await runTest("testZTAPIXPathParsing") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -258,7 +269,7 @@ class ZTAPITests {
                 provider: stubProvider
             )
 
-            // 使用 parseResponse 解析多个 XPath
+            // Use parseResponse to parse multiple XPaths
             let results = try await api.parseResponse(
                 ZTAPIParseConfig("success", type: Bool.self),
                 ZTAPIParseConfig("data/user", type: String.self),
@@ -266,7 +277,7 @@ class ZTAPITests {
                 ZTAPIParseConfig("data/count", type: Int.self)
             )
 
-            log("  解析结果数量: \(results.count)")
+            log("  Parsed result count: \(results.count)")
             if let success = results["success"] as? Bool {
                 log("  success: \(success)")
             }
@@ -280,11 +291,11 @@ class ZTAPITests {
                 log("  count: \(count)")
             }
 
-            assertTrue(results.count == 4, "应解析出 4 个字段")
+            assertTrue(results.count == 4, "Should parse 4 fields")
         }
     }
 
-    /// 测试 ZTUploadItem
+    /// Test ZTUploadItem
     func testZTUploadItem() {
         log("\n========== testZTUploadItem ==========")
 
@@ -292,7 +303,7 @@ class ZTAPITests {
         let item1 = ZTAPI<ZTAPIKVParam>.ZTUploadItem.data(data, name: "file", fileName: "test.txt", mimeType: .txt)
         let item2 = ZTAPI<ZTAPIKVParam>.ZTUploadItem.file(URL(fileURLWithPath: "/path/to/file.jpg"), name: "image", mimeType: .jpeg)
 
-        // 转换为 bodyPart
+        // Convert to bodyPart
         let part1 = item1.bodyPart
         assertEqual(part1.name, "file")
         assertEqual(part1.fileName, "test.txt")
@@ -300,10 +311,10 @@ class ZTAPITests {
         let part2 = item2.bodyPart
         assertEqual(part2.name, "image")
 
-        log("  ✅ ZTUploadItem 测试通过")
+        log("  ✅ ZTUploadItem test passed")
     }
 
-    /// 测试使用 Codable 解析
+    /// Test using Codable for parsing
     func testZTAPIWithCodable() async {
         await runTest("testZTAPIWithCodable") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -323,13 +334,13 @@ class ZTAPITests {
             )
             .response()
 
-            assertTrue(response.success, "响应 success 应为 true")
+            assertTrue(response.success, "Response success should be true")
             assertEqual(response.message, "Hello from stub")
-            log("  Codable 解析成功")
+            log("  Codable parsing success")
         }
     }
 
-    /// 测试返回原始 Data
+    /// Test returning raw Data
     func testZTAPIReturnData() async {
         await runTest("testZTAPIReturnData") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -347,11 +358,11 @@ class ZTAPITests {
             .send()
 
             assertEqual(data, Data("raw response data".utf8))
-            log("  原始 Data 返回正确")
+            log("  Raw Data returned correctly")
         }
     }
 
-    /// 测试 ZTAPI 错误处理 - 无效 URL
+    /// Test ZTAPI error handling - invalid URL
     func testZTAPIInvalidURL() async {
         await runTest("testZTAPIInvalidURL") {
             await assertThrowsError {
@@ -360,7 +371,7 @@ class ZTAPITests {
         }
     }
 
-    /// 测试 ZTAPI Publisher
+    /// Test ZTAPI Publisher
     func testZTAPIPublisher() async {
         await runTest("testZTAPIPublisher") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -392,16 +403,16 @@ class ZTAPITests {
 
             try await Task.sleep(nanoseconds: 100_000_000)
 
-            assertTrue(receivedResult != nil || receivedError != nil, "应收到结果或错误")
+            assertTrue(receivedResult != nil || receivedError != nil, "Should receive result or error")
             if let user = receivedResult {
-                log("  Publisher 收到响应: \(user.name)")
+                log("  Publisher received response: \(user.name)")
             }
 
             cancellable.cancel()
         }
     }
 
-    /// 测试不同 Publisher 实例独立执行
+    /// Test different Publisher instances execute independently
     func testDifferentPublisherInstances() async {
         await runTest("testDifferentPublisherInstances") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -436,16 +447,16 @@ class ZTAPITests {
 
             try await Task.sleep(nanoseconds: 100_000_000)
 
-            assertTrue(firstCall, "第一个订阅应执行")
-            log("  第一次订阅: \(firstCall ? "执行" : "未执行")")
-            log("  第二次订阅: \(secondCall ? "执行" : "未执行")")
+            assertTrue(firstCall, "First subscription should execute")
+            log("  First subscription: \(firstCall ? "executed" : "not executed")")
+            log("  Second subscription: \(secondCall ? "executed" : "not executed")")
 
             p1.cancel()
             p2.cancel()
         }
     }
 
-    /// 测试未订阅时不执行请求
+    /// Test request not executed without subscription
     func testPublisherNoExecutionWithoutSubscription() async {
         await runTest("testPublisherNoExecutionWithoutSubscription") {
             final class CountingStubProvider: @unchecked Sendable, ZTAPIProvider {
@@ -470,14 +481,14 @@ class ZTAPITests {
 
             try await Task.sleep(nanoseconds: 100_000_000)
 
-            assertTrue(provider.requestCount == 0, "未订阅时不应执行请求")
-            log("  未订阅时请求次数: \(provider.requestCount)")
+            assertTrue(provider.requestCount == 0, "Should not execute request without subscription")
+            log("  Request count without subscription: \(provider.requestCount)")
         }
     }
 
-    // MARK: - Timeout & Retry 测试
+    // MARK: - Timeout & Retry Tests
 
-    /// 测试 Timeout 设置
+    /// Test Timeout setting
     func testTimeout() async {
         await runTest("testTimeout") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -497,14 +508,14 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ 应该超时但没有")
+                log("  ❌ Should timeout but didn't")
             } catch {
-                log("  ✅ 正确捕获超时错误: \(error)")
+                log("  ✅ Correctly caught timeout error: \(error)")
             }
         }
     }
 
-    /// 测试固定重试策略
+    /// Test fixed retry policy
     func testFixedRetryPolicy() async {
         await runTest("testFixedRetryPolicy") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -529,14 +540,14 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ 应该抛出错误但没有")
+                log("  ❌ Should throw error but didn't")
             } catch {
-                log("  ✅ 正确捕获错误（已重试）: \(error)")
+                log("  ✅ Correctly caught error (retried): \(error)")
             }
         }
     }
 
-    /// 测试重试后成功
+    /// Test retry then success
     func testRetryThenSuccess() async {
         await runTest("testRetryThenSuccess") {
             final class CountingStubRetrySuccessProvider: @unchecked Sendable, ZTAPIProvider {
@@ -547,8 +558,7 @@ class ZTAPITests {
                     if callCount <= 2 {
                         let url = urlRequest.url ?? URL(string: "https://api.example.com")!
                         let response = HTTPURLResponse(url: url, statusCode: 500, httpVersion: nil, headerFields: nil)!
-                        let error = NSError(domain: "Test", code: 500, userInfo: ["HTTPURLResponse": response])
-                        throw error
+                        throw ZTAPIError(500, "Test error", httpResponse: response)
                     }
                     let data = try! JSONSerialization.data(withJSONObject: ["result": "success"])
                     let url = urlRequest.url ?? URL(string: "https://api.example.com")!
@@ -573,12 +583,12 @@ class ZTAPITests {
             .response()
 
             assertEqual(response.result, "success")
-            assertTrue(provider.callCount == 3, "应该重试了2次后成功，共3次请求")
-            log("  ✅ 重试后成功，总请求次数: \(provider.callCount)")
+            assertTrue(provider.callCount == 3, "Should retry 2 times then succeed, total 3 requests")
+            log("  ✅ Retry succeeded, total request count: \(provider.callCount)")
         }
     }
 
-    /// 测试不可重试的错误不触发重试
+    /// Test non-retryable error doesn't trigger retry
     func testNonRetryableError() async {
         await runTest("testNonRetryableError") {
             final class CountingStubNonRetryableProvider: @unchecked Sendable, ZTAPIProvider {
@@ -586,7 +596,7 @@ class ZTAPITests {
 
                 func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
                     callCount += 1
-                    throw NSError(domain: "Test", code: 404, userInfo: nil)
+                    throw ZTAPIError(404, "Not found")
                 }
             }
 
@@ -602,15 +612,15 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ 应该抛出错误")
+                log("  ❌ Should throw error")
             } catch {
-                assertTrue(provider.callCount == 1, "不可重试错误不应触发重试")
-                log("  ✅ 不可重试错误只执行一次，调用次数: \(provider.callCount)")
+                assertTrue(provider.callCount == 1, "Non-retryable error shouldn't trigger retry")
+                log("  ✅ Non-retryable error executed once, call count: \(provider.callCount)")
             }
         }
     }
 
-    /// 测试组合配置 timeout + retry
+    /// Test combined timeout + retry configuration
     func testTimeoutAndRetry() async {
         await runTest("testTimeoutAndRetry") {
             final class SlowStubProvider: @unchecked Sendable, ZTAPIProvider {
@@ -619,7 +629,7 @@ class ZTAPITests {
                 func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
                     callCount += 1
                     try await Task.sleep(nanoseconds: 50_000_000)
-                    throw NSError(domain: "Test", code: 500, userInfo: nil)
+                    throw ZTAPIError(500, "Test error")
                 }
             }
 
@@ -639,13 +649,13 @@ class ZTAPITests {
                 _ = try await api.send()
             } catch {
                 let elapsed = Date().timeIntervalSince(start)
-                assertTrue(elapsed < 2.0, "应该在超时时间内结束")
-                log("  ✅ 组合配置测试通过，耗时: \(String(format: "%.2f", elapsed))s，调用次数: \(provider.callCount)")
+                assertTrue(elapsed < 2.0, "Should complete within timeout")
+                log("  ✅ Combined config test passed, elapsed: \(String(format: "%.2f", elapsed))s, call count: \(provider.callCount)")
             }
         }
     }
 
-    /// 测试没有重试策略时不重试
+    /// Test no retry when no retry policy
     func testNoRetryPolicy() async {
         await runTest("testNoRetryPolicy") {
             final class CountingStubNoRetryProvider: @unchecked Sendable, ZTAPIProvider {
@@ -653,7 +663,7 @@ class ZTAPITests {
 
                 func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler? = nil) async throws -> (Data, HTTPURLResponse) {
                     callCount += 1
-                    throw NSError(domain: "Test", code: 500, userInfo: nil)
+                    throw ZTAPIError(500, "Test error")
                 }
             }
 
@@ -666,17 +676,17 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ 应该抛出错误")
+                log("  ❌ Should throw error")
             } catch {
-                assertTrue(provider.callCount == 1, "没有重试策略时不应重试")
-                log("  ✅ 没有重试策略只执行一次，调用次数: \(provider.callCount)")
+                assertTrue(provider.callCount == 1, "Should not retry without retry policy")
+                log("  ✅ No retry policy executed once, call count: \(provider.callCount)")
             }
         }
     }
 
     // MARK: - Upload Tests
 
-    /// 测试 upload 方法构建 Multipart 数据
+    /// Test upload method building Multipart data
     func testUploadMethod() async {
         await runTest("testUploadMethod") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -691,16 +701,16 @@ class ZTAPITests {
                         .data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
 
             assertEqual(api.params.count, 0)
-            assertTrue(api.bodyData == nil, "bodyData 应被 multipart 清除")
+            assertTrue(api.bodyData == nil, "bodyData should be cleared by multipart")
 
             let data = try await api.send()
-            assertTrue(!data.isEmpty, "应收到响应")
+            assertTrue(!data.isEmpty, "Should receive response")
 
-            log("  ✅ upload 方法测试通过")
+            log("  ✅ upload method test passed")
         }
     }
 
-    /// 测试 multipart 方法
+    /// Test multipart method
     func testMultipartMethod() async {
         await runTest("testMultipartMethod") {
             let stubProvider = ZTStubProvider(stubs: [
@@ -717,13 +727,13 @@ class ZTAPITests {
                 .multipart(formData)
 
             let data = try await api.send()
-            assertTrue(!data.isEmpty, "应收到响应")
+            assertTrue(!data.isEmpty, "Should receive response")
 
-            log("  ✅ multipart 方法测试通过")
+            log("  ✅ multipart method test passed")
         }
     }
 
-    /// 测试 Plugin 的 process hook
+    /// Test Plugin process hook
     func testPluginProcessHook() async {
         await runTest("testPluginProcessHook") {
             struct UpperCaseValuePlugin: ZTAPIPlugin {
@@ -756,16 +766,16 @@ class ZTAPITests {
                 .plugins(UpperCaseValuePlugin())
                 .response()
 
-            // process hook 会将响应值转为大写
+            // process hook will uppercase response value
             assertEqual(result.message, "HELLO WORLD")
-            log("  ✅ Plugin process hook 测试通过")
+            log("  ✅ Plugin process hook test passed")
         }
     }
 
-    /// 验证 Token refresh 并发安全
+    /// Verify Token refresh concurrency safety
     func testChatGPT_TokenRefresh_ConcurrencyRace() async {
         await runTest("testChatGPT_TokenRefresh_ConcurrencyRace") {
-            log("  验证：多个并发请求触发 token 刷新的行为")
+            log("  Verify: behavior of multiple concurrent requests triggering token refresh")
 
             actor RefreshCounter {
                 private(set) var refreshCount = 0
@@ -786,7 +796,7 @@ class ZTAPITests {
 
             let counter = RefreshCounter()
 
-            // 测试不使用 Actor 的旧版本
+            // Test old version without Actor
             let oldPlugin = ZTTokenRefreshPlugin(
                 shouldRefresh: { _ in true },
                 refresh: {
@@ -807,8 +817,7 @@ class ZTAPITests {
                     requestCount += 1
                     let url = urlRequest.url ?? URL(string: "https://api.example.com")!
                     let response = HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil)!
-                    let error = NSError(domain: "Test", code: 401, userInfo: ["HTTPURLResponse": response])
-                    throw error
+                    throw ZTAPIError(401, "Unauthorized", httpResponse: response)
                 }
             }
 
@@ -830,13 +839,13 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 200_000_000)
 
             let oldCounts = await counter.counts
-            log("  不使用 Actor 时: refresh 被调用 \(oldCounts.refresh) 次, onRefresh 被调用 \(oldCounts.onRefresh) 次")
+            log("  Without Actor: refresh called \(oldCounts.refresh) times, onRefresh called \(oldCounts.onRefresh) times")
 
             if oldCounts.refresh > 1 {
-                log("  ✅ 确认：不使用 Actor 时存在并发竞态（多次刷新）")
+                log("  ✅ Confirmed: without Actor, concurrent race exists (multiple refreshes)")
             }
 
-            // 测试使用 Actor 的新版本
+            // Test new version with Actor
             let newCounter = RefreshCounter()
 
             let newPlugin = ZTTokenRefreshPlugin(
@@ -868,21 +877,21 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 200_000_000)
 
             let newCounts = await newCounter.counts
-            log("  使用 Actor 后: refresh 被调用 \(newCounts.refresh) 次, onRefresh 被调用 \(newCounts.onRefresh) 次")
+            log("  With Actor: refresh called \(newCounts.refresh) times, onRefresh called \(newCounts.onRefresh) times")
 
             if newCounts.refresh == 1 {
-                log("  ✅ 确认：使用 Actor 后只刷新一次（single-flight 模式生效）")
+                log("  ✅ Confirmed: with Actor, only refreshed once (single-flight mode effective)")
                 passedCount += 1
             } else if newCounts.refresh < oldCounts.refresh {
-                log("  ✅ 使用 Actor 后刷新次数明显减少（从 \(oldCounts.refresh) 降到 \(newCounts.refresh)）")
+                log("  ✅ With Actor, refresh count significantly reduced (from \(oldCounts.refresh) to \(newCounts.refresh))")
                 passedCount += 1
             }
 
-            log("  结论：修复后的 ZTTokenRefresher Actor 有效防止了并发刷新")
+            log("  Conclusion: Fixed ZTTokenRefresher Actor effectively prevents concurrent refreshes")
         }
     }
 
-    /// 测试并发控制 Provider
+    /// Test concurrency control Provider
     func testConcurrencyProvider() async {
         await runTest("testConcurrencyProvider") {
             actor ConcurrencyTracker {
@@ -950,63 +959,63 @@ class ZTAPITests {
 
             let stats = await tracker.getStats()
 
-            log("  完成请求数: \(stats.completed)")
-            log("  最大并发数: \(stats.max)")
+            log("  Completed requests: \(stats.completed)")
+            log("  Max concurrent: \(stats.max)")
 
             if stats.max <= 3 {
-                log("  ✅ 并发控制正常：最大并发数为 \(stats.max)，不超过限制值 3")
+                log("  ✅ Concurrency control normal: max concurrent \(stats.max), not exceeding limit 3")
                 passedCount += 1
             } else {
-                log("  ❌ 并发控制失效：最大并发数为 \(stats.max)，超过限制值 3")
+                log("  ❌ Concurrency control failed: max concurrent \(stats.max), exceeds limit 3")
                 failedCount += 1
             }
 
             if stats.completed == 10 {
-                log("  ✅ 所有请求都已完成")
+                log("  ✅ All requests completed")
             } else {
-                log("  ⚠️  部分请求未完成: \(stats.completed)/10")
+                log("  ⚠️  Some requests not completed: \(stats.completed)/10")
             }
         }
     }
 
-    /// 测试全局 API Provider
+    /// Test global API Provider
     func testGlobalAPIProvider() async {
         await runTest("testGlobalAPIProvider") {
-            // 配置全局 Provider
-            ZTGlobalAPIProvider.configure(ZTURLSessionProvider(), maxConcurrency: 6)
+            // 1️⃣ Configure global Provider
+            await ZTGlobalAPIProviderStore.shared.configure(
+                baseProvider: ZTURLSessionProvider(),
+                maxConcurrency: 6
+            )
 
-            let originalMax = ZTGlobalAPIProvider.shared.currentMaxConcurrency
-            log("  默认全局并发数: \(originalMax)")
+            // 2️⃣ Get global Provider (actor)
+            let globalProvider = await ZTGlobalAPIProviderStore.shared.get()
+
+            // 3️⃣ Read default concurrency
+            let originalMax = await globalProvider.currentMaxConcurrency
+            log("  Default global concurrency: \(originalMax)")
             assertEqual(originalMax, 6)
 
-            ZTGlobalAPIProvider.shared.setMaxConcurrency(3)
-            let newMax = ZTGlobalAPIProvider.shared.currentMaxConcurrency
-            log("  修改后全局并发数: \(newMax)")
+            // 4️⃣ Change concurrency
+            await globalProvider.setMaxConcurrency(3)
+
+            let newMax = await globalProvider.currentMaxConcurrency
+            log("  Modified global concurrency: \(newMax)")
             assertEqual(newMax, 3)
 
-            let api1 = ZTAPI<ZTAPIKVParam>.global("https://api.example.com/test1", .get)
-            let api2 = ZTAPI<ZTAPIKVParam>.global("https://api.example.com/test2", .post)
-
-            assertEqual(api1.urlStr, "https://api.example.com/test1")
-            assertEqual(api1.method, .get)
-            assertEqual(api2.urlStr, "https://api.example.com/test2")
-            assertEqual(api2.method, .post)
-            log("  ✅ global() 方法正确创建了 API 实例")
-
-            ZTGlobalAPIProvider.shared.setMaxConcurrency(originalMax)
-            log("  ✅ 全局 API Provider 测试通过")
+            // 6️⃣ Restore concurrency
+            await globalProvider.setMaxConcurrency(originalMax)
+            log("  ✅ Global API Provider test passed")
         }
     }
-
-    // MARK: - 运行所有测试
+    // MARK: - Run All Tests
 
     func runAllTests() async {
         log("\n")
         log("╔════════════════════════════════════════════════════════════╗")
-        log("║           ZTAPI 测试套件开始运行                              ║")
+        log("║           ZTAPI Test Suite Started                            ║")
         log("╚════════════════════════════════════════════════════════════╝")
 
-        // 基础单元测试
+        // Basic unit tests
         testZTAPIErrorDescription()
         testZTURLEncodingGET()
         testZTURLEncodingPOST()
@@ -1015,7 +1024,7 @@ class ZTAPITests {
         testZTAPIChaining()
         testZTUploadItem()
 
-        // Codable 测试
+        // Codable tests
         await testZTAPIWithCodable()
         await testZTAPIReturnData()
         await testZTAPIInvalidURL()
@@ -1023,10 +1032,10 @@ class ZTAPITests {
         await testDifferentPublisherInstances()
         await testPublisherNoExecutionWithoutSubscription()
 
-        // XPath 解析测试
+        // XPath parsing tests
         await testZTAPIXPathParsing()
 
-        // Timeout & Retry 测试
+        // Timeout & Retry tests
         await testTimeout()
         await testFixedRetryPolicy()
         await testRetryThenSuccess()
@@ -1034,34 +1043,34 @@ class ZTAPITests {
         await testTimeoutAndRetry()
         await testNoRetryPolicy()
 
-        // Upload 测试
+        // Upload tests
         await testUploadMethod()
         await testMultipartMethod()
 
-        // Plugin 测试
+        // Plugin tests
         await testPluginProcessHook()
 
-        // Token 刷新并发安全测试
+        // Token refresh concurrency safety tests
         await testChatGPT_TokenRefresh_ConcurrencyRace()
 
-        // 并发控制测试
+        // Concurrency control tests
         await testConcurrencyProvider()
         await testGlobalAPIProvider()
 
-        // 打印总结
+        // Print summary
         log("\n")
         log("╔════════════════════════════════════════════════════════════╗")
-        log("║                    测试结果汇总                              ║")
+        log("║                    Test Summary                                 ║")
         log("╠════════════════════════════════════════════════════════════╣")
-        log("║  通过: \(passedCount)                                       ║")
-        log("║  失败: \(failedCount)                                       ║")
-        log("║  总计: \(passedCount + failedCount)                         ║")
+        log("║  Passed: \(passedCount)                                         ║")
+        log("║  Failed: \(failedCount)                                         ║")
+        log("║  Total: \(passedCount + failedCount)                           ║")
         log("╚════════════════════════════════════════════════════════════╝")
 
         if failedCount == 0 {
-            log("\n✅ 所有测试通过！")
+            log("\n✅ All tests passed!")
         } else {
-            log("\n❌ 有 \(failedCount) 个测试失败")
+            log("\n❌ \(failedCount) test(s) failed")
         }
     }
 }

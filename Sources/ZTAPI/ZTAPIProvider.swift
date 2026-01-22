@@ -1,26 +1,41 @@
 //
 //  ZTAPIProvider.swift
-//  SnapkitDemo
+//  ZTAPI
 //
-//  Created by zt
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
 
-/// 网络请求提供者协议
+/// Network request provider protocol
 public protocol ZTAPIProvider: Sendable {
-    /// 发送请求
+    /// Send request
     /// - Parameters:
-    ///   - urlRequest: 请求对象（超时已通过 URLRequest.timeoutInterval 设置）
-    ///   - uploadProgress: 上传进度回调（可选）
-    /// - Returns: (响应数据, HTTP响应)
+    ///   - urlRequest: Request object (timeout already set via URLRequest.timeoutInterval)
+    ///   - uploadProgress: Upload progress callback (optional)
+    /// - Returns: (Response data, HTTP response)
     func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse)
 }
 
 
 
 
-/// Provider 重试包装器（请求级别重试，内部使用）
+/// Provider retry wrapper (request-level retry, internal use)
 final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
     private let baseProvider: any ZTAPIProvider
     private let retryPolicy: any ZTAPIRetryPolicy
@@ -34,30 +49,41 @@ final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
         var attempt = 0
 
         while true {
+            try Task.checkCancellation()
+
             do {
-                return try await baseProvider.request(urlRequest, uploadProgress: uploadProgress)
+                return try await baseProvider.request(
+                    urlRequest,
+                    uploadProgress: uploadProgress
+                )
             } catch {
-                // 从错误中提取 HTTPURLResponse，以便重试策略能根据状态码判断
-                var httpResponse: HTTPURLResponse?
-                if let urlResponse = (error as NSError).userInfo["HTTPURLResponse"] as? HTTPURLResponse {
-                    httpResponse = urlResponse
+                if error is CancellationError {
+                    throw error
                 }
 
-                guard await retryPolicy.shouldRetry(request: urlRequest, error: error,
-                                                    attempt: attempt, response: httpResponse) else {
+                attempt += 1
+
+                // Try to get associated HTTPURLResponse from ZTAPIError
+                let httpResponse = (error as? ZTAPIError)?.httpResponse
+
+                guard await retryPolicy.shouldRetry(
+                    request: urlRequest,
+                    error: error,
+                    attempt: attempt,
+                    response: httpResponse
+                ) else {
                     throw error
                 }
 
                 let delay = await retryPolicy.delay(for: attempt)
-                attempt += 1
 
-#if DEBUG
-                print("[ZTAPI] Request-level retry (attempt \(attempt)) after \(delay)s delay")
-#endif
+    #if DEBUG
+                print("[ZTAPI] Retry attempt \(attempt) after \(delay)s")
+    #endif
 
-                try await Task.detached {
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                }.value
+                try await Task.sleep(
+                    nanoseconds: UInt64(delay * 1_000_000_000)
+                )
             }
         }
     }

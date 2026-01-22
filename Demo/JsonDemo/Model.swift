@@ -1,8 +1,23 @@
 //
-//  API.swift
+//  Model.swift
 //  JsonDemo
 //
-//  Created by zt on 2025/3/29.
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
@@ -254,14 +269,14 @@ extension URL: @retroactive ZTJSONExportable {
 }
 
 
-/// Double 类型转换器 - 用于将 JSON 值转换为 Double
+/// Double type transformer - converts JSON values to Double
 struct TransformDouble: ZTTransform {
     static func transform(_ json: JSON) -> Double? {
         json.doubleValue
     }
 }
 
-/// URL 类型转换器 - 用于将 JSON 字符串转换为 URL
+/// URL type transformer - converts JSON strings to URL
 struct TransformHttp: ZTTransform {
     static func transform(_ json: JSON) -> URL? {
         URL(string: json.stringValue)

@@ -1,28 +1,43 @@
 //
 //  ZTAPIRetryPolicy.swift
-//  SnapkitDemo
+//  ZTAPI
 //
-//  Created by zt
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
 
 // MARK: - Retry Policy
 
-/// 重试策略协议
+/// Retry policy protocol
 public protocol ZTAPIRetryPolicy: Sendable {
-    /// 是否应该重试
+    /// Whether should retry
     func shouldRetry(
         request: URLRequest,
         error: Error,
         attempt: Int,
         response: HTTPURLResponse?
     ) async -> Bool
-    /// 下次重试前的延迟时间（秒）
+    /// Delay before next retry (seconds)
     func delay(for attempt: Int) async -> TimeInterval
 }
 
-/// 固定次数重试策略
+/// Fixed count retry policy
 public struct ZTFixedRetryPolicy: ZTAPIRetryPolicy {
     public let maxAttempts: Int
     public let delay: TimeInterval
@@ -49,14 +64,13 @@ public struct ZTFixedRetryPolicy: ZTAPIRetryPolicy {
     ) async -> Bool {
         guard attempt < maxAttempts else { return false }
 
-        // 检查 HTTP 状态码
+        // Check HTTP status code
         if let statusCode = response?.statusCode, retryableCodes.contains(statusCode) {
             return true
         }
 
-        // 检查 NSError 错误码
-        let nsError = error as NSError
-        if retryableErrorCodes.contains(nsError.code) {
+        // Check ZTAPIError code
+        if let apiError = error as? ZTAPIError, retryableErrorCodes.contains(apiError.code) {
             return true
         }
 
@@ -68,7 +82,7 @@ public struct ZTFixedRetryPolicy: ZTAPIRetryPolicy {
     }
 }
 
-/// 指数退避重试策略
+/// Exponential backoff retry policy
 public struct ZTExponentialBackoffRetryPolicy: ZTAPIRetryPolicy {
     public let maxAttempts: Int
     public let baseDelay: TimeInterval
@@ -105,8 +119,7 @@ public struct ZTExponentialBackoffRetryPolicy: ZTAPIRetryPolicy {
             return true
         }
 
-        let nsError = error as NSError
-        if retryableErrorCodes.contains(nsError.code) {
+        if let apiError = error as? ZTAPIError, retryableErrorCodes.contains(apiError.code) {
             return true
         }
 
@@ -119,7 +132,7 @@ public struct ZTExponentialBackoffRetryPolicy: ZTAPIRetryPolicy {
     }
 }
 
-/// 自定义条件重试策略
+/// Custom condition retry policy
 public struct ZTConditionalRetryPolicy: ZTAPIRetryPolicy {
     public let maxAttempts: Int
     public let delay: TimeInterval

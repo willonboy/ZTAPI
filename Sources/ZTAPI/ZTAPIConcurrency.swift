@@ -1,16 +1,31 @@
 //
 //  ZTAPIConcurrency.swift
-//  SnapkitDemo
+//  ZTAPI
 //
-//  Created by zt
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
 
 // MARK: - Concurrency Control
 
-/// 并发控制信号量（Actor 保护）
-/// 用于限制同时进行的网络请求数量
+/// Concurrency control semaphore (Actor protected)
+/// Used to limit the number of concurrent network requests
 private actor ZTConcurrencySemaphore {
     private var currentCount = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -20,17 +35,19 @@ private actor ZTConcurrencySemaphore {
         self.maxCount = maxCount
     }
 
-    /// 获取执行许可，当达到上限时会等待
     func acquire() async {
-        currentCount += 1
-        if currentCount > maxCount {
-            await withCheckedContinuation { continuation in
-                waiters.append(continuation)
-            }
+        if currentCount < maxCount {
+            currentCount += 1
+            return
         }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+        // When woken up, already "inherited" a released slot
+        currentCount += 1
     }
 
-    /// 释放许可，唤醒等待的任务
     func release() {
         if let waiter = waiters.first {
             waiters.removeFirst()
@@ -40,124 +57,145 @@ private actor ZTConcurrencySemaphore {
         }
     }
 
-    /// 获取当前并发数
     func getCurrentCount() -> Int {
         currentCount
     }
 
-    /// 获取最大并发数
     nonisolated func getMaxConcurrency() -> Int {
         maxCount
     }
 }
 
 
-/// 并发控制 Provider（内部使用）
-/// 限制同时进行的网络请求数量，避免过多并发导致资源耗尽
+/// Concurrency control Provider (internal use)
+/// Limits the number of concurrent network requests to avoid resource exhaustion
 final class ZTConcurrencyProvider: ZTAPIProvider {
-    /// 底层 Provider（暴露以便外部访问和复用）
     let baseProvider: any ZTAPIProvider
     private let semaphore: ZTConcurrencySemaphore
 
-    /// 当前最大并发数
     var maxConcurrentOperationCount: Int {
         semaphore.getMaxConcurrency()
     }
 
-    /// 初始化并发控制 Provider
-    /// - Parameters:
-    ///   - baseProvider: 底层 Provider，实际执行网络请求
-    ///   - maxConcurrency: 最大并发数，默认 6
     init(baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
         self.baseProvider = baseProvider
         self.semaphore = ZTConcurrencySemaphore(maxCount: maxConcurrency)
     }
 
-    /// 发送请求，受并发数限制控制
-    /// - Parameters:
-    ///   - urlRequest: 请求对象
-    ///   - uploadProgress: 上传进度回调（可选）
-    /// - Returns: (响应数据, HTTP响应)
     func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse) {
-        // 获取执行许可（如果达到上限会等待）
         await semaphore.acquire()
-
         defer {
-            // 释放许可
             Task {
                 await semaphore.release()
             }
         }
 
-        // 执行实际的网络请求
-        return try await baseProvider.request(urlRequest, uploadProgress: uploadProgress)
+        return try await baseProvider.request(
+            urlRequest,
+            uploadProgress: uploadProgress
+        )
     }
 }
 
 // MARK: - Global API Provider
 
-/// App 全局 API Provider 单例
-/// 所有网络请求通过此 Provider 发起，自动控制并发数
-/// 使用前必须先调用 configure(_:) 配置
-public final class ZTGlobalAPIProvider: @unchecked Sendable {
-    nonisolated(unsafe) private static var _instance: ZTGlobalAPIProvider?
 
-    /// 共享实例
-    /// 使用前必须先调用 configure(_:) 配置
-    public static var shared: ZTGlobalAPIProvider {
-        guard let instance = _instance else {
-            fatalError("ZTGlobalAPIProvider not configured. Call configure(_:) first.")
+/// Global API Provider (business Actor)
+/// Responsible for maintaining current Provider state
+public actor ZTGlobalAPIProvider {
+
+    private var baseProvider: any ZTAPIProvider
+    private var concurrencyProvider: ZTConcurrencyProvider
+    private(set) var currentMaxConcurrency: Int
+
+    init(baseProvider: any ZTAPIProvider, maxConcurrency: Int) {
+        self.baseProvider = baseProvider
+        self.currentMaxConcurrency = maxConcurrency
+        self.concurrencyProvider = ZTConcurrencyProvider(
+            baseProvider: baseProvider,
+            maxConcurrency: maxConcurrency
+        )
+    }
+
+    /// Exposed Provider
+    public var provider: any ZTAPIProvider {
+        concurrencyProvider
+    }
+
+    /// Replace underlying Provider (keep concurrency count)
+    public func setProvider(_ newProvider: any ZTAPIProvider) {
+        baseProvider = newProvider
+        concurrencyProvider = ZTConcurrencyProvider(
+            baseProvider: newProvider,
+            maxConcurrency: currentMaxConcurrency
+        )
+    }
+
+    /// Change max concurrency count
+    public func setMaxConcurrency(_ count: Int) {
+        currentMaxConcurrency = count
+        concurrencyProvider = ZTConcurrencyProvider(
+            baseProvider: baseProvider,
+            maxConcurrency: count
+        )
+    }
+}
+
+/// Global Provider storage Actor
+/// Responsible for lifecycle and singleton semantics
+public actor ZTGlobalAPIProviderStore {
+    public static let shared = ZTGlobalAPIProviderStore()
+    private var instance: ZTGlobalAPIProvider?
+
+    private init() {}
+
+    /// Configure global Provider
+    public func configure(baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
+        instance = ZTGlobalAPIProvider(baseProvider: baseProvider, maxConcurrency: maxConcurrency)
+    }
+
+    /// Get global Provider
+    public func get() -> ZTGlobalAPIProvider {
+        guard let instance else {
+            fatalError(
+                "ZTGlobalAPIProvider not configured. Call configure() first."
+            )
         }
         return instance
     }
 
-    /// 底层并发控制 Provider
-    public private(set) var provider: any ZTAPIProvider
-
-    /// 当前最大并发数
-    public private(set) var currentMaxConcurrency: Int
-
-    /// 修改属性时的锁
-    private let lock = DispatchQueue(label: "com.zt.global-api.lock")
-
-    /// 原始基础 Provider（不含并发控制包装）
-    private var baseProvider: any ZTAPIProvider
-
-    private init(baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
-        self.currentMaxConcurrency = maxConcurrency
-        self.baseProvider = baseProvider
-        // 包装并发控制
-        self.provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: maxConcurrency)
+    /// Reset (usually only for testing)
+    public func reset() {
+        instance = nil
     }
+}
 
-    /// 配置全局 Provider
-    /// - Parameters:
-    ///   - baseProvider: 底层 Provider
-    ///   - maxConcurrency: 最大并发数，默认 6
-    public static func configure(_ baseProvider: any ZTAPIProvider, maxConcurrency: Int = 6) {
-        _instance = ZTGlobalAPIProvider(baseProvider: baseProvider, maxConcurrency: maxConcurrency)
+
+/// Synchronous proxy for global Provider
+/// Purpose:
+/// - Provide synchronously available ZTAPIProvider
+/// - Internally forward to actor-managed global Provider
+final class ZTGlobalProviderProxy: ZTAPIProvider {
+    static let shared = ZTGlobalProviderProxy()
+
+    private init() {}
+
+    func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse) {
+        let globalProvider = await ZTGlobalAPIProviderStore.shared.get()
+        let provider = await globalProvider.provider
+
+        return try await provider.request(
+            urlRequest,
+            uploadProgress: uploadProgress
+        )
     }
+}
 
-    /// 重置配置（主要用于测试）
-    public static func reset() {
-        _instance = nil
-    }
+// MARK: - Global Provider Convenience
 
-    /// 设置新的基础 Provider（保留当前并发数配置）
-    /// - Parameter baseProvider: 新的基础 Provider
-    public func setProvider(_ baseProvider: any ZTAPIProvider) {
-        lock.sync {
-            self.baseProvider = baseProvider
-            provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: currentMaxConcurrency)
-        }
-    }
-
-    /// 修改全局并发数（保留现有 baseProvider）
-    /// - Parameter count: 新的最大并发数
-    public func setMaxConcurrency(_ count: Int) {
-        lock.sync {
-            provider = ZTConcurrencyProvider(baseProvider: baseProvider, maxConcurrency: count)
-            currentMaxConcurrency = count
-        }
+extension ZTAPI {
+    /// Create API instance using global Provider
+    public static func global(_ url: String, _ method: ZTHTTPMethod = .get) -> ZTAPI<P> {
+        ZTAPI(url, method, provider: ZTGlobalProviderProxy.shared)
     }
 }

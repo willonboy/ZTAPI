@@ -1,15 +1,30 @@
 //
 //  ZTAPIPlugin.swift
-//  SnapkitDemo
+//  ZTAPI
 //
-//  Created by zt
+//  Copyright (c) 2026 trojanzhang. All rights reserved.
+//
+//  This file is part of ZTAPI.
+//
+//  ZTAPI is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU Affero General Public License as published
+//  by the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  ZTAPI is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU Affero General Public License for more details.
+//
+//  You should have received a copy of the GNU Affero General Public License
+//  along with ZTAPI. If not, see <https://www.gnu.org/licenses/>.
 //
 
 import Foundation
 
 // MARK: - Built-in Plugins
 
-/// 日志插件
+/// Log plugin
 public struct ZTLogPlugin: ZTAPIPlugin {
     public enum LogLevel: Sendable {
         case verbose
@@ -19,8 +34,8 @@ public struct ZTLogPlugin: ZTAPIPlugin {
 
     public let level: LogLevel
 
-    /// 最大 body 打印长度（字节），超过则只打印字节数
-    /// 防止打印大 JSON 导致内存峰值
+    /// Maximum body print length (bytes), only print byte count if exceeded
+    /// Prevent memory spikes from printing large JSON
     private let maxBodyPrintLength: Int
 
     public init(level: LogLevel = .verbose, maxBodyPrintLength: Int = 1024) {
@@ -32,32 +47,38 @@ public struct ZTLogPlugin: ZTAPIPlugin {
         guard level != .none else { return }
 
         if level == .verbose {
-            var output = """
-            ================== Request ==================
-            URL: \(request.url?.absoluteString ?? "nil")
-            Method: \(request.httpMethod ?? "nil")
-            Headers:
-            """
+            var output = "curl"
 
-            for (key, value) in request.allHTTPHeaderFields ?? [:] {
-                output += "  \(key): \(value)\n"
+            // Method
+            if let method = request.httpMethod, method != "GET" {
+                output += " -X \(method)"
             }
 
-            if let body = request.httpBody {
+            // URL
+            if let url = request.url?.absoluteString {
+                output += " '\(url)'"
+            }
+
+            // Headers
+            for (key, value) in request.allHTTPHeaderFields ?? [:] {
+                // Escape single quotes
+                let escapedValue = value.replacingOccurrences(of: "'", with: "'\\''")
+                output += " \\\n  -H '\(key): \(escapedValue)'"
+            }
+
+            // Body
+            if let body = request.httpBody, !body.isEmpty {
                 let previewCount = min(body.count, maxBodyPrintLength)
                 let preview = body.prefix(previewCount)
-                if body.count <= maxBodyPrintLength {
-                    if let str = String(data: preview, encoding: .utf8) {
-                        output += "Body: \(str)\n"
-                    } else {
-                        output += "Body: \(body.count) bytes (binary)\n"
-                    }
+
+                if body.count <= maxBodyPrintLength,
+                   let bodyStr = String(data: preview, encoding: .utf8) {
+                    let escapedBody = bodyStr.replacingOccurrences(of: "'", with: "'\\''")
+                    output += " \\\n  -d '\(escapedBody)'"
                 } else {
-                    output += "Body: \(body.count) bytes (truncated)\n"
+                    output += " \\\n  -d '<\(body.count) bytes data>'"
                 }
             }
-
-            output += "============================================"
 
             print(output)
         } else {
@@ -105,8 +126,8 @@ public struct ZTLogPlugin: ZTAPIPlugin {
     }
 }
 
-/// 认证插件 - 自动添加 Token
-public struct XMAuthPlugin: ZTAPIPlugin {
+/// Authentication plugin - automatically add Token
+public struct ZTAuthPlugin: ZTAPIPlugin {
     let token: @Sendable () -> String?
     
     public init(_ handler: @escaping @Sendable () -> String?) {
@@ -119,23 +140,23 @@ public struct XMAuthPlugin: ZTAPIPlugin {
     }
 }
 
-/// Token 刷新器 - 使用 Actor 确保并发安全
-/// 实现 single-flight 模式：多个并发请求只会触发一次 token 刷新
+/// Token refresher - uses Actor to ensure thread safety
+/// Implements single-flight pattern: multiple concurrent requests only trigger one token refresh
 public actor ZTTokenRefresher {
     private var refreshingTask: Task<String, Error>?
 
     public init() {}
 
-    /// 刷新 token（如果已有刷新任务在进行，则复用该任务的结果）
+    /// Refresh token (reuse existing refresh task result if one is in progress)
     public func refreshIfNeeded(
         _ action: @escaping () async throws -> String
     ) async throws -> String {
-        // 如果已有刷新任务在进行，等待其完成
+        // If a refresh task is already in progress, wait for it to complete
         if let task = refreshingTask {
             return try await task.value
         }
 
-        // 创建新的刷新任务
+        // Create new refresh task
         let task = Task {
             defer { refreshingTask = nil }
             return try await action()
@@ -145,13 +166,13 @@ public actor ZTTokenRefresher {
     }
 }
 
-/// Token 刷新插件
+/// Token refresh plugin
 public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
     let shouldRefresh: @Sendable (_ error: Error) -> Bool
     let refresh: @Sendable () async throws -> String
     let onRefresh: @Sendable (String) -> Void
 
-    /// Token 刷新器 - 如果为 nil 则不使用 single-flight 模式
+    /// Token refresher - nil means don't use single-flight mode
     private let refresher: ZTTokenRefresher?
 
     public init(
@@ -167,7 +188,7 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
     }
 
     public func willSend(_ request: inout URLRequest) async throws {
-        // 这里可以实现 token 过期检查
+        // Can implement token expiration check here
     }
 
     public func didCatch(_ error: Error) async throws {
@@ -175,10 +196,10 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
             do {
                 let newToken: String
                 if let refresher = refresher {
-                    // 使用 single-flight 模式刷新
+                    // Use single-flight mode to refresh
                     newToken = try await refresher.refreshIfNeeded(refresh)
                 } else {
-                    // 直接刷新（不推荐，可能导致并发刷新）
+                    // Direct refresh (not recommended, may cause concurrent refreshes)
                     newToken = try await refresh()
                 }
                 onRefresh(newToken)
@@ -189,20 +210,20 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
     }
 }
 
-/// JSON 解码插件 - 自动将响应数据解析为 JSON 并重新编码
+/// JSON decode plugin - automatically parse response data as JSON and re-encode
 public struct ZTJSONDecodePlugin: ZTAPIPlugin {
     public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
-        // 尝试解析 JSON，美化后再编码返回
+        // Try to parse JSON, beautify then re-encode and return
         guard let json = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) else {
-            return data  // 如果不是 JSON，原样返回
+            return data  // If not JSON, return as-is
         }
         return prettyData
     }
 }
 
-/// 数据解密插件 - 示例：自动解密响应数据
-public struct XMDecryptPlugin: ZTAPIPlugin {
+/// Data decrypt plugin - example: automatically decrypt response data
+public struct ZTDecryptPlugin: ZTAPIPlugin {
     let decrypt: @Sendable (Data) -> Data
     
     public init(_ handler: @escaping @Sendable (Data) -> Data) {
@@ -214,25 +235,129 @@ public struct XMDecryptPlugin: ZTAPIPlugin {
     }
 }
 
-/// 响应头添加插件 - 示例：将响应头信息添加到数据中
+/// Response header injector plugin - example: add response header info to data
 public struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
     public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
-        // 将响应头信息添加到 JSON 中
+        // Add response header info to JSON
         guard let json = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments]),
               let jsonObject = json as? [String: Any] else {
             return data
         }
 
-        // 添加响应头元数据
+        // Add response header metadata
         var metadata: [String: Any] = [
             "_response": [
                 "statusCode": response.statusCode,
                 "headers": response.allHeaderFields
             ]
         ]
-        // 合并原有数据
+        // Merge original data
         metadata.merge(jsonObject) { $1 }
 
-        return try JSONSerialization.data(withJSONObject: metadata)
+        do {
+            return try JSONSerialization.data(withJSONObject: metadata)
+        } catch {
+            // NSError subclass (JSONSerialization error)
+            if type(of: error) is NSError.Type {
+                let nsError = error as NSError
+                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)")
+            }
+            throw error
+        }
+    }
+}
+
+// Sometimes there are different providers that may need to convert to upper-level Error types
+public struct ZTTransferErrorPlugin: ZTAPIPlugin {
+    let transfer: @Sendable (Error) -> Error
+    
+    public init(_ handler: @escaping @Sendable (Error) -> Error) {
+        transfer = handler
+    }
+    
+    public func didCatch(_ error: Error) async throws {
+        throw transfer(error)
+    }
+}
+
+// Check if the returned { "code": 0, "message": "...", "data": ... } code is not 0
+public struct ZTCheckRespOKPlugin: ZTAPIPlugin {
+    public init() {}
+
+    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {
+        // Only handle HTTP success case
+        guard response.statusCode == 200 else {
+            throw ZTAPIError(response.statusCode, "HTTP error: \(response.statusCode)")
+        }
+
+        let json: [String: Any]
+        do {
+            guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw ZTAPIError.invalidResponseFormat
+            }
+            json = j
+        } catch {
+            if error is ZTAPIError { throw error }
+            // NSError subclass (JSONSerialization error)
+            if type(of: error) is NSError.Type {
+                let nsError = error as NSError
+                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)")
+            }
+            throw error
+        }
+
+        let code = json["code"] as? String
+        // Check business code
+        if code != "0" {
+            let msg = json["message"] as? String
+            throw ZTAPIError(Int(code ?? "") ?? -999997, msg ?? "API returned unknown error")
+        }
+    }
+}
+
+// Extract data field from returned { "code": 0, "message": "...", "data": ... } structure
+public struct ZTReadPayloadPlugin: ZTAPIPlugin {
+    public init() {}
+
+    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+        let json: [String: Any]
+        do {
+            guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw ZTAPIError.invalidResponseFormat
+            }
+            json = j
+        } catch {
+            if error is ZTAPIError { throw error }
+            // NSError subclass (JSONSerialization error)
+            if type(of: error) is NSError.Type {
+                let nsError = error as NSError
+                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)")
+            }
+            throw error
+        }
+
+        guard let payload = json["data"] else {
+            return Data("null".utf8)
+        }
+
+        // Always use JSONSerialization to avoid illegal JSON
+        if payload is NSNull {
+            return Data("null".utf8)
+        }
+
+        guard JSONSerialization.isValidJSONObject(payload) else {
+            throw ZTAPIError.unsupportedPayloadType
+        }
+
+        do {
+            return try JSONSerialization.data(withJSONObject: payload)
+        } catch {
+            // NSError subclass (JSONSerialization error)
+            if type(of: error) is NSError.Type {
+                let nsError = error as NSError
+                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)")
+            }
+            throw error
+        }
     }
 }
