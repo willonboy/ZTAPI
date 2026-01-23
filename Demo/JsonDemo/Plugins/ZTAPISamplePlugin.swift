@@ -1,5 +1,5 @@
 //
-//  ZTAPIPlugin.swift
+//  ZTAPISamplePlugin.swift
 //  ZTAPI
 //
 //  Copyright (c) 2026 trojanzhang. All rights reserved.
@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import ZTAPICore
 
 // MARK: - Built-in Plugins
 

@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import ZTAPICore
 
 // MARK: - URLSession Provider
 

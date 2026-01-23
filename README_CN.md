@@ -1,5 +1,48 @@
 # ZTAPI
 
+## 流畅链式 DSL
+
+ZTAPI 采用 **Fluent Interface / Builder 模式**，所有配置方法返回 `Self` 并标记 `@discardableResult`：
+
+```swift
+import ZTAPI
+
+// 完整的链式 DSL 示例
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
+    .params(.kv("id", 123), .kv("include", "profile"))
+    .headers(.kv("Authorization", "Bearer xxx"))
+    .timeout(30)
+    .retry(ZTExponentialBackoffRetryPolicy(maxRetries: 3))
+    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .imageJPEG))
+    .uploadProgress { progress in
+        print("上传进度: \(progress.fractionCompleted)")
+    }
+    .jsonDecoder { decoder in
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+    }
+    .plugins(logPlugin, authPlugin)
+    .response()
+```
+
+**DSL 方法列表：**
+
+| 方法 | 功能 |
+|------|------|
+| `.params(...)` | 添加请求参数 |
+| `.headers(...)` | 添加 HTTP 头 |
+| `.encoding(...)` | 设置参数编码方式 |
+| `.body(...)` | 设置原始请求体 |
+| `.upload(...)` | 上传文件 |
+| `.multipart(...)` | 设置 multipart 表单 |
+| `.timeout(...)` | 设置超时时间 |
+| `.retry(...)` | 设置重试策略 |
+| `.uploadProgress(...)` | 上传进度回调 |
+| `.jsonDecoder {...}` | 配置 JSONDecoder |
+| `.plugins(...)` | 添加插件 |
+
+---
+
 ZTAPI 是一个超越 Moya 的现代化 Swift 网络请求库。通过 **enum 模块化封装**、**XPath 解析**、**宏自动生成**，提供比 Moya 更强大、更简洁的 API 管理方案。
 
 ## 核心优势
@@ -18,8 +61,66 @@ ZTAPI 是一个超越 Moya 的现代化 Swift 网络请求库。通过 **enum �
 
 ### Swift Package Manager
 
+**完整功能（ZTAPICore + ZTAPIXPath + ZTAPIParamMacro）：**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPI", package: "ZTAPI")  // 包含 ZTAPICore + ZTAPIXPath + ZTAPIParamMacro
+        ]
+    )
+]
 ```
-https://github.com/willonboy/ZTAPI.git
+
+**仅 ZTAPICore（无第三方依赖）：**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI")  // 仅 ZTAPICore 功能
+        ]
+    )
+]
+```
+
+**ZTAPICore + ZTAPIParamMacro（含宏支持）：**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI"),
+            .product(name: "ZTAPIParamMacro", package: "ZTAPI")  // 启用 @ZTAPIParam 宏
+        ]
+    )
+]
+```
+
+**ZTAPICore + ZTAPIXPath（含 XPath 解析）：**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI"),
+            .product(name: "ZTAPIXPath", package: "ZTAPI")  // 启用 XPath 解析
+        ]
+    )
+]
 ```
 
 ### CocoaPods
@@ -142,11 +243,10 @@ do {
 
 ### 1. @ZTAPIParam 宏 - 类型安全参数
 
-使用 `@ZTAPIParam` 宏（需要 ZTJSON）生成类型安全参数，自动映射 key：
+使用 `@ZTAPIParam` 宏（需要 ZTAPIParamMacro）生成类型安全参数，自动映射 key：
 
 ```swift
-#if canImport(ZTJSON)
-import ZTJSON
+import ZTAPIParamMacro
 
 enum UserCenterAPI {
     static var baseUrl: String { "https://api.example.com" }
@@ -182,13 +282,12 @@ enum UserCenterAPI {
 // userId → "uid"（必填，通过 @ZTAPIParamKey 自定义）
 //
 // isValid 自动校验：非 Optional 参数必须存在，否则抛出异常
-#endif
 ```
 
 **对比手动实现：**
 
 ```swift
-// 无 ZTJSON 时需要手写
+// 无宏时需要手写
 enum UserAPIParam: ZTAPIParamProtocol {
     case userName(String)
     case password(String)
@@ -317,6 +416,8 @@ let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1")
 
 ### 4. 运行时 XPath 解析
 
+> XPath 解析扩展在 `ZTAPIXPath` 模块中（需要 ZTJSON）。
+
 运行时解析多个 XPath 路径，无需定义模型：
 
 ```swift
@@ -406,6 +507,7 @@ ZTAPI 通过 `ZTAPIProvider` 协议抽象底层网络实现，支持多种 Provi
 | `ZTAlamofireProvider`  | 基于 Alamofire         | Alamofire |
 | `ZTStubProvider`       | 单元测试 Mock          | 无        |
 | `ZTSSLPinningProvider` | SSL 证书固定（URLSession） | 无     |
+| `ZTAPICacheProvider`   | 内存缓存，支持策略配置 | 无        |
 
 ```swift
 // 使用 shared 单例
@@ -413,6 +515,68 @@ let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZT
 
 // 或使用 Alamofire
 let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZTAlamofireProvider.shared)
+
+// 或使用缓存
+let cacheProvider = ZTAPICacheProvider(
+    baseProvider: ZTURLSessionProvider.shared,
+    readPolicy: .cacheElseNetwork,
+    cacheDuration: 300
+)
+let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: cacheProvider)
+```
+
+### 缓存 Provider
+
+> 缓存 Provider 的实现代码在 Demo 工程的 `ZTAPICacheProvider.swift` 中。
+
+`ZTAPICacheProvider` 包装任意 Provider，添加可配置的内存缓存和 LRU 淘汰策略：
+
+```swift
+// 创建缓存 Provider
+let cacheProvider = ZTAPICacheProvider(
+    baseProvider: ZTURLSessionProvider.shared,
+    readPolicy: .cacheElseNetwork,
+    cacheDuration: 300               // 5 分钟
+)
+
+// 使用
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .get, provider: cacheProvider)
+    .response()
+```
+
+**缓存读取策略：**
+
+| 策略                  | 说明                              |
+| --------------------- | --------------------------------- |
+| `.networkOnly`        | 仅从网络获取，忽略缓存            |
+| `.cacheOnly`          | 仅读缓存，未命中时报错            |
+| `.cacheElseNetwork`   | 先读缓存，未命中则网络请求        |
+| `.networkElseCache`   | 先网络请求，失败时回退到缓存      |
+
+**缓存写入策略：**
+
+| 策略          | 说明                     |
+| ------------- | ------------------------ |
+| `.never`      | 从不写入缓存             |
+| `.always`     | 总是写入缓存             |
+| `.onSuccess`  | 仅成功响应时写入 (2xx)    |
+
+**缓存管理：**
+
+```swift
+// 清除所有缓存
+await cacheProvider.clearCache()
+
+// 清除指定 URL
+await cacheProvider.clearCache(url: "https://api.example.com/user/123")
+
+// 获取缓存统计
+let stats = await cacheProvider.cacheStats
+print("缓存命中率: \(stats.formattedHitRate)")
+print("缓存大小: \(stats.formattedSize)")
+
+// 清除过期条目
+await cacheProvider.removeExpired()
 ```
 
 ### Plugin 插件系统
@@ -496,19 +660,19 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom")
 
 ### SSL Pinning
 
-> SSL Pinning 实现在 Demo 工程的 `ZTAPISecurityPlugin.swift` 中。
+> SSL Pinning 的实现代码在 Demo 工程的 `ZTAPISecurityPlugin.swift` 和 `ZTAlamofireSecurityExtension.swift` 中。
 
 **URLSession SSL Pinning：**
 
 ```swift
 // 证书固定
-let certificates = ZTCertificateLoader.load(from: "myserver")
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver") // 从 Bundle 加载 myserver.cer
 let provider = ZTSSLPinningProvider(mode: .certificate(certificates))
 
 // 公钥固定
-let certificates = ZTCertificateLoader.load(from: "myserver")
-let publicKeys = ZTCertificateLoader.publicKeys(from: certificates)
-let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeys))
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
+let publicKeyHashes = ZTCertificateLoader.publicKeyHashes(from: certificates)
+let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeyHashes))
 
 // 禁用验证（仅开发环境）
 let provider = ZTSSLPinningProvider(mode: .disabled)
@@ -516,16 +680,19 @@ let provider = ZTSSLPinningProvider(mode: .disabled)
 
 **Alamofire SSL Pinning：**
 
+> 注：Alamofire Provider 仅支持证书固定，如需公钥固定请使用 `ZTSSLPinningProvider`。
+
 ```swift
 import Alamofire
 
 // 从 Bundle 加载证书固定
 let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
 
-// 从 Bundle 加载公钥固定
-let provider = ZTAlamofireProvider.publicKeyPinning(from: "myserver")
+// 或直接使用 pinning(mode:) 方法
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
+let provider = ZTAlamofireProvider.pinning(mode: .certificate(certificates))
 
-// 禁用验证（仅开发环境）
+// 禁用验证（仅开发环境，仅 DEBUG 模式可用）
 let provider = ZTAlamofireProvider.insecureProvider()
 ```
 
@@ -536,26 +703,17 @@ openssl s_client -connect api.example.com:443 -showcerts
 
 ### 并发控制
 
+> 全局 API Provider 的实现代码在 Demo 工程的 `ZTAPIGlobalManager.swift` 中。
+
+全局 Provider 已预配置（Alamofire + 并发限制 6）：
+
 ```swift
-// 配置全局 Provider
-await ZTGlobalAPIProviderStore.shared.configure(
-    baseProvider: ZTURLSessionProvider(),
-    maxConcurrency: 6
-)
-
-// 获取全局 Provider
-let globalProvider = await ZTGlobalAPIProviderStore.shared.get()
-
-// 读取当前并发限制
-let currentMax = await globalProvider.currentMaxConcurrency
-
-// 修改并发限制
-await globalProvider.setMaxConcurrency(10)
-
-// 使用全局 Provider
+// 直接使用全局 Provider（无需配置）
 let result = try await ZTAPI<ZTAPIKVParam>.global("https://api.example.com/data")
     .response()
 ```
+
+如需自定义全局 Provider（如使用 URLSession 或修改并发限制），请修改 Demo 工程中的 `ZTAPIGlobalManager.provider`。
 
 ### Combine 支持
 
@@ -669,10 +827,11 @@ public enum ZTHTTPMethod: Sendable {
 
 ## 可选依赖
 
-| 库            | 用途                      |
-| ------------- | ------------------------- |
-| **Alamofire** | 使用 `ZTAlamofireProvider` |
-| **ZTJSON**    | `@ZTAPIParam` 宏、XPath 解析 |
+| 库             | 用途                          |
+| -------------- | ----------------------------- |
+| **Alamofire**  | 使用 `ZTAlamofireProvider`    |
+| **ZTJSON**     | XPath 解析                     |
+| **SwiftyJSON** | `ZTAPIXPath` 产品必需       |
 
 > 注：内置 Plugin 和 Provider 的实现代码在 Demo 工程中，按需复制使用。
 

@@ -21,6 +21,8 @@
 //
 
 import Foundation
+import CryptoKit
+import ZTAPICore
 
 // MARK: - SSL Pinning Plugin
 
@@ -43,158 +45,134 @@ public struct ZTSSLPinningValidator: Sendable {
         self.mode = mode
     }
 
-    /// Validate server certificate (synchronous method for URLSessionDelegate callback)
     public func validate(
         serverTrust: SecTrust,
-        domain: String?
+        domain: String
     ) -> Bool {
+        if case .disabled = mode {
+            return true
+        }
+        // 必须先做系统信任链校验
+        let policy = SecPolicyCreateSSL(true, domain as CFString)
+        SecTrustSetPolicies(serverTrust, policy)
+
+        guard SecTrustEvaluateWithError(serverTrust, nil) else {
+            return false
+        }
+
+        // 再做 Pinning
         switch mode {
-        case .certificate(let certificates):
-            return validateCertificate(serverTrust: serverTrust, pinnedCertificates: certificates)
-        case .publicKey(let publicKeys):
-            return validatePublicKey(serverTrust: serverTrust, pinnedPublicKeys: publicKeys)
+        case .certificate(let certs):
+            guard !certs.isEmpty else { return false }
+            return validateCertificate(
+                serverTrust: serverTrust,
+                pinnedCertificates: certs
+            )
+
+        case .publicKey(let keys):
+            guard !keys.isEmpty else { return false }
+            return validatePublicKey(
+                serverTrust: serverTrust,
+                pinnedKeyHashes: keys
+            )
+
         case .disabled:
             return true
         }
     }
 
-    // MARK: - Certificate Validation
+    // MARK: - Certificate Pinning (Chain-aware)
 
     private func validateCertificate(
         serverTrust: SecTrust,
         pinnedCertificates: [Data]
     ) -> Bool {
-        guard let serverCertificate = SecTrustGetCertificateAtIndex(serverTrust, 0) else {
-            return false
-        }
 
-        let serverCertificateData = SecCertificateCopyData(serverCertificate) as Data
+        let serverCertCount = SecTrustGetCertificateCount(serverTrust)
 
-        for pinnedCertificate in pinnedCertificates {
-            if serverCertificateData == pinnedCertificate {
+        for index in 0..<serverCertCount {
+            guard let cert = SecTrustGetCertificateAtIndex(serverTrust, index) else {
+                continue
+            }
+            let certData = SecCertificateCopyData(cert) as Data
+            if pinnedCertificates.contains(certData) {
                 return true
             }
         }
-
         return false
     }
 
-    // MARK: - Public Key Validation
+    // MARK: - Public Key Pinning (SHA256)
 
     private func validatePublicKey(
         serverTrust: SecTrust,
-        pinnedPublicKeys: [Data]
+        pinnedKeyHashes: [Data]
     ) -> Bool {
-        for index in 0..<SecTrustGetCertificateCount(serverTrust) {
-            guard let certificate = SecTrustGetCertificateAtIndex(serverTrust, index) else {
-                continue
-            }
 
-            guard let publicKey = publicKey(for: certificate) else {
-                continue
-            }
+        let certCount = SecTrustGetCertificateCount(serverTrust)
 
-            for pinnedKey in pinnedPublicKeys {
-                if publicKey == pinnedKey {
-                    return true
-                }
+        for index in 0..<certCount {
+            guard
+                let cert = SecTrustGetCertificateAtIndex(serverTrust, index),
+                let key = SecCertificateCopyKey(cert),
+                let hash = sha256(of: key)
+            else { continue }
+
+            if pinnedKeyHashes.contains(hash) {
+                return true
             }
         }
-
         return false
     }
 
-    private func publicKey(for certificate: SecCertificate) -> Data? {
-        var publicKey: SecKey?
-        let policy = SecPolicyCreateBasicX509()
-        var trust: SecTrust?
-        let status = SecTrustCreateWithCertificates(certificate, policy, &trust)
-
-        guard status == errSecSuccess,
-              let trust = trust,
-              SecTrustEvaluateWithError(trust, nil) else {
-            return nil
-        }
-
-        publicKey = SecTrustCopyPublicKey(trust)
-
-        guard let publicKey = publicKey else {
-            return nil
-        }
-
+    private func sha256(of key: SecKey) -> Data? {
         var error: Unmanaged<CFError>?
-        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+        guard let keyData = SecKeyCopyExternalRepresentation(key, &error) as Data? else {
             return nil
         }
-
-        return publicKeyData
+        let digest = SHA256.hash(data: keyData)
+        return Data(digest)
     }
 }
 
 // MARK: - Certificate Loader
 
-/// Certificate loading utility
 public enum ZTCertificateLoader {
 
-    /// Load certificates from Bundle
-    /// - Parameters:
-    ///   - name: Certificate file name (without extension)
-    ///   - bundle: Bundle, defaults to .main
-    /// - Returns: Array of certificate data
-    public static func load(
-        from name: String,
+    public static func loadCertificates(
+        named name: String,
         bundle: Bundle = .main
     ) -> [Data] {
-        var certificates: [Data] = []
 
-        // Try loading .cer format
-        if let url = bundle.url(forResource: name, withExtension: "cer"),
-           let data = try? Data(contentsOf: url) {
-            certificates.append(data)
+        var results: [Data] = []
+
+        for ext in ["cer", "der"] {
+            if let url = bundle.url(forResource: name, withExtension: ext),
+               let data = try? Data(contentsOf: url) {
+                results.append(data)
+            }
         }
-
-        // Try loading .der format
-        if let url = bundle.url(forResource: name, withExtension: "der"),
-           let data = try? Data(contentsOf: url) {
-            certificates.append(data)
-        }
-
-        return certificates
+        return results
     }
 
-    /// Extract public keys from certificate data
-    /// - Parameter certificates: Array of certificate data
-    /// - Returns: Array of public key data
-    public static func publicKeys(from certificates: [Data]) -> [Data] {
-        var publicKeys: [Data] = []
+    /// 提取 Public Key 的 SHA256 Hash（用于 pinning）
+    public static func publicKeyHashes(
+        from certificates: [Data]
+    ) -> [Data] {
 
-        for certificateData in certificates {
-            guard let certificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
-                continue
-            }
+        var hashes: [Data] = []
 
-            var publicKey: SecKey?
-            let policy = SecPolicyCreateBasicX509()
-            var trust: SecTrust?
-            let status = SecTrustCreateWithCertificates(certificate, policy, &trust)
+        for certData in certificates {
+            guard
+                let cert = SecCertificateCreateWithData(nil, certData as CFData),
+                let key = SecCertificateCopyKey(cert),
+                let keyData = SecKeyCopyExternalRepresentation(key, nil) as Data?
+            else { continue }
 
-            guard status == errSecSuccess,
-                  let trust = trust,
-                  SecTrustEvaluateWithError(trust, nil) else {
-                continue
-            }
-
-            publicKey = SecTrustCopyPublicKey(trust)
-
-            if let publicKey = publicKey {
-                var error: Unmanaged<CFError>?
-                if let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? {
-                    publicKeys.append(publicKeyData)
-                }
-            }
+            let digest = SHA256.hash(data: keyData)
+            hashes.append(Data(digest))
         }
-
-        return publicKeys
+        return hashes
     }
 }
 
@@ -270,7 +248,8 @@ public final class ZTSSLPinningProvider: @unchecked Sendable, ZTAPIProvider {
             didReceive challenge: URLAuthenticationChallenge,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
-            guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                  let serverTrust = challenge.protectionSpace.serverTrust else {
                 completionHandler(.performDefaultHandling, nil)
                 return
             }

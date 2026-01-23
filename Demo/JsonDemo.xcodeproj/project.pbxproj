@@ -17,14 +17,15 @@
 		7BA3BE0C2F166FCE0037DC68 /* VM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BA3BE0B2F166FCB0037DC68 /* VM.swift */; };
 		7BAF137C2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */; };
 		7BAF137D2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */; };
-		97046CB72F16A7F30050B940 /* ZTAPIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97046CB42F16A7F20050B940 /* ZTAPIProvider.swift */; };
-		97046CB82F16A7F30050B940 /* ZTAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97046CB32F16A7F20050B940 /* ZTAPI.swift */; };
-		97046CBB2F16A8520050B940 /* ZTJSON in Frameworks */ = {isa = PBXBuildFile; productRef = 97046CBA2F16A8520050B940 /* ZTJSON */; };
+		7BC8AE892F2342ED00803A2C /* ZTAPICacheProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC8AE882F2342ED00803A2C /* ZTAPICacheProvider.swift */; };
+		7BC8AE8E2F236C8900803A2C /* ZTAPIGlobalManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC8AE8D2F236C8900803A2C /* ZTAPIGlobalManager.swift */; };
+		7BC8AEB82F23B41600803A2C /* ZTAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 7BC8AEB72F23B41600803A2C /* ZTAPI */; };
+		7BC8AEBA2F23B41600803A2C /* ZTAPICore in Frameworks */ = {isa = PBXBuildFile; productRef = 7BC8AEB92F23B41600803A2C /* ZTAPICore */; };
+		7BC8AEBC2F23B41600803A2C /* ZTAPIParamMacro in Frameworks */ = {isa = PBXBuildFile; productRef = 7BC8AEBB2F23B41600803A2C /* ZTAPIParamMacro */; };
+		7BC8AEBE2F23B41600803A2C /* ZTAPIXPath in Frameworks */ = {isa = PBXBuildFile; productRef = 7BC8AEBD2F23B41600803A2C /* ZTAPIXPath */; };
 		973C2C112F17EC1600043196 /* ZTAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 973C2C102F17EC1600043196 /* ZTAPITests.swift */; };
-		974596CA2F1FCDD3008FB437 /* ZTAPIPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974596C82F1FCDD3008FB437 /* ZTAPIPlugin.swift */; };
+		974596CA2F1FCDD3008FB437 /* ZTAPISamplePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974596C82F1FCDD3008FB437 /* ZTAPISamplePlugin.swift */; };
 		974596CB2F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */; };
-		97F7FF032F19391F00DDFDAD /* ZTAPIConcurrency.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FEFE2F19391F00DDFDAD /* ZTAPIConcurrency.swift */; };
-		97F7FF052F19391F00DDFDAD /* ZTAPIRetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FF012F19391F00DDFDAD /* ZTAPIRetryPolicy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,13 +39,11 @@
 		7BA3BE0B2F166FCB0037DC68 /* VM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VM.swift; sourceTree = "<group>"; };
 		7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAlamofireSecurityExtension.swift; sourceTree = "<group>"; };
 		7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPISecurityPlugin.swift; sourceTree = "<group>"; };
-		97046CB32F16A7F20050B940 /* ZTAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPI.swift; sourceTree = "<group>"; };
-		97046CB42F16A7F20050B940 /* ZTAPIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIProvider.swift; sourceTree = "<group>"; };
+		7BC8AE882F2342ED00803A2C /* ZTAPICacheProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPICacheProvider.swift; sourceTree = "<group>"; };
+		7BC8AE8D2F236C8900803A2C /* ZTAPIGlobalManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIGlobalManager.swift; sourceTree = "<group>"; };
 		973C2C102F17EC1600043196 /* ZTAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPITests.swift; sourceTree = "<group>"; };
-		974596C82F1FCDD3008FB437 /* ZTAPIPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIPlugin.swift; sourceTree = "<group>"; };
+		974596C82F1FCDD3008FB437 /* ZTAPISamplePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPISamplePlugin.swift; sourceTree = "<group>"; };
 		974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZTAPIProvider+Impls.swift"; sourceTree = "<group>"; };
-		97F7FEFE2F19391F00DDFDAD /* ZTAPIConcurrency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIConcurrency.swift; sourceTree = "<group>"; };
-		97F7FF012F19391F00DDFDAD /* ZTAPIRetryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPIRetryPolicy.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,9 +51,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BC8AEB82F23B41600803A2C /* ZTAPI in Frameworks */,
 				7BA3BDB92F15DC310037DC68 /* ZTJSON in Frameworks */,
-				97046CBB2F16A8520050B940 /* ZTJSON in Frameworks */,
+				7BC8AEBA2F23B41600803A2C /* ZTAPICore in Frameworks */,
+				7BC8AEBE2F23B41600803A2C /* ZTAPIXPath in Frameworks */,
 				7B0E3EDF2D978AC3002EA290 /* Alamofire in Frameworks */,
+				7BC8AEBC2F23B41600803A2C /* ZTAPIParamMacro in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,7 +66,6 @@
 		7B0E3EB92D9786F1002EA290 = {
 			isa = PBXGroup;
 			children = (
-				97046CB62F16A7F20050B940 /* Sources */,
 				7B5A0E602D9BCF06007AEC15 /* JsonDemo */,
 				7B0E3EC32D9786F1002EA290 /* Products */,
 			);
@@ -81,12 +82,9 @@
 		7B5A0E602D9BCF06007AEC15 /* JsonDemo */ = {
 			isa = PBXGroup;
 			children = (
-				7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */,
-				7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */,
+				7BC8AE8A2F23554700803A2C /* Plugins */,
 				973C2C102F17EC1600043196 /* ZTAPITests.swift */,
 				7B5A0E592D9BCF06007AEC15 /* Model.swift */,
-				974596C82F1FCDD3008FB437 /* ZTAPIPlugin.swift */,
-				974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */,
 				7B5A0E5A2D9BCF06007AEC15 /* AppDelegate.swift */,
 				7B5A0E5B2D9BCF06007AEC15 /* Assets.xcassets */,
 				7B5A0E5C2D9BCF06007AEC15 /* Info.plist */,
@@ -97,25 +95,18 @@
 			path = JsonDemo;
 			sourceTree = "<group>";
 		};
-		97046CB52F16A7F20050B940 /* ZTAPI */ = {
+		7BC8AE8A2F23554700803A2C /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
-				97F7FEFE2F19391F00DDFDAD /* ZTAPIConcurrency.swift */,
-				97F7FF012F19391F00DDFDAD /* ZTAPIRetryPolicy.swift */,
-				97046CB32F16A7F20050B940 /* ZTAPI.swift */,
-				97046CB42F16A7F20050B940 /* ZTAPIProvider.swift */,
+				7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */,
+				7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */,
+				7BC8AE882F2342ED00803A2C /* ZTAPICacheProvider.swift */,
+				974596C82F1FCDD3008FB437 /* ZTAPISamplePlugin.swift */,
+				974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */,
+				7BC8AE8D2F236C8900803A2C /* ZTAPIGlobalManager.swift */,
 			);
-			path = ZTAPI;
+			path = Plugins;
 			sourceTree = "<group>";
-		};
-		97046CB62F16A7F20050B940 /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				97046CB52F16A7F20050B940 /* ZTAPI */,
-			);
-			name = Sources;
-			path = ../Sources;
-			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -136,7 +127,10 @@
 			packageProductDependencies = (
 				7B0E3EDE2D978AC3002EA290 /* Alamofire */,
 				7BA3BDB82F15DC310037DC68 /* ZTJSON */,
-				97046CBA2F16A8520050B940 /* ZTJSON */,
+				7BC8AEB72F23B41600803A2C /* ZTAPI */,
+				7BC8AEB92F23B41600803A2C /* ZTAPICore */,
+				7BC8AEBB2F23B41600803A2C /* ZTAPIParamMacro */,
+				7BC8AEBD2F23B41600803A2C /* ZTAPIXPath */,
 			);
 			productName = JsonDemo;
 			productReference = 7B0E3EC22D9786F1002EA290 /* JsonDemo.app */;
@@ -169,7 +163,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7B0E3EDD2D978AC3002EA290 /* XCRemoteSwiftPackageReference "Alamofire" */,
-				97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */,
+				7BC8AEB62F23B41600803A2C /* XCLocalSwiftPackageReference "../../ZTAPI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7B0E3EC32D9786F1002EA290 /* Products */;
@@ -202,15 +196,13 @@
 				7B5A0E612D9BCF06007AEC15 /* Model.swift in Sources */,
 				7B5A0E622D9BCF06007AEC15 /* AppDelegate.swift in Sources */,
 				7BAF137C2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift in Sources */,
+				7BC8AE8E2F236C8900803A2C /* ZTAPIGlobalManager.swift in Sources */,
 				7BAF137D2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift in Sources */,
 				7BA3BE0C2F166FCE0037DC68 /* VM.swift in Sources */,
 				7B5A0E632D9BCF06007AEC15 /* ViewController.swift in Sources */,
-				97F7FF032F19391F00DDFDAD /* ZTAPIConcurrency.swift in Sources */,
-				974596CA2F1FCDD3008FB437 /* ZTAPIPlugin.swift in Sources */,
+				974596CA2F1FCDD3008FB437 /* ZTAPISamplePlugin.swift in Sources */,
 				974596CB2F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift in Sources */,
-				97F7FF052F19391F00DDFDAD /* ZTAPIRetryPolicy.swift in Sources */,
-				97046CB72F16A7F30050B940 /* ZTAPIProvider.swift in Sources */,
-				97046CB82F16A7F30050B940 /* ZTAPI.swift in Sources */,
+				7BC8AE892F2342ED00803A2C /* ZTAPICacheProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -437,6 +429,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		7BC8AEB62F23B41600803A2C /* XCLocalSwiftPackageReference "../../ZTAPI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../ZTAPI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		7B0E3EDD2D978AC3002EA290 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -444,14 +443,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 5.11.0;
-			};
-		};
-		97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/willonboy/ztjson.git";
-			requirement = {
-				kind = revision;
-				revision = bca045f488adf345786dce4016f800047876ecbc;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -466,10 +457,21 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ZTJSON;
 		};
-		97046CBA2F16A8520050B940 /* ZTJSON */ = {
+		7BC8AEB72F23B41600803A2C /* ZTAPI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 97046CB92F16A8520050B940 /* XCRemoteSwiftPackageReference "ztjson" */;
-			productName = ZTJSON;
+			productName = ZTAPI;
+		};
+		7BC8AEB92F23B41600803A2C /* ZTAPICore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ZTAPICore;
+		};
+		7BC8AEBB2F23B41600803A2C /* ZTAPIParamMacro */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ZTAPIParamMacro;
+		};
+		7BC8AEBD2F23B41600803A2C /* ZTAPIXPath */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ZTAPIXPath;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

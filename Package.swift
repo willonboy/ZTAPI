@@ -9,19 +9,54 @@ let package = Package(
     products: [
         .library(
             name: "ZTAPI",
-            targets: ["ZTAPI"]
+            targets: ["ZTAPICore", "ZTAPIXPath", "ZTAPIParamMacro"]
+        ),
+        .library(
+            name: "ZTAPICore",
+            targets: ["ZTAPICore"]
+        ),
+        .library(
+            name: "ZTAPIXPath",
+            targets: ["ZTAPIXPath"]
+        ),
+        .library(
+            name: "ZTAPIParamMacro",
+            targets: ["ZTAPIParamMacro"]
         ),
     ],
     dependencies: [
-//        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", from: "5.0.2"),
-//        .package(url: "https://github.com/willonboy/ZTJSON.git", from: "2.0.0"),
-//        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.11.0")
+        .package(url: "https://github.com/willonboy/ZTJSON.git", from: "2.1.0"),
+        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", from: "5.0.2"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0-latest")
     ],
     targets: [
         .target(
-            name: "ZTAPI",
+            name: "ZTAPICore",
             dependencies: [],
-            path: "Sources/ZTAPI"
+            path: "Sources/ZTAPICore"
+        ),
+        .target(
+            name: "ZTAPIXPath",
+            dependencies: [
+                "ZTAPICore",
+                .product(name: "ZTJSON", package: "ZTJSON"),
+                .product(name: "SwiftyJSON", package: "SwiftyJSON")
+            ],
+            path: "Sources/ZTAPIXPath"
+        ),
+        .macro(
+            name: "ZTAPIParamMacros",
+            dependencies: [
+                "ZTAPICore",
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
+            ],
+            path: "Sources/ZTAPIParamMacros"
+        ),
+        .target(
+            name: "ZTAPIParamMacro",
+            dependencies: ["ZTAPICore", "ZTAPIParamMacros"],
+            path: "Sources/ZTAPIParamMacro"
         ),
     ]
 )

@@ -25,7 +25,8 @@ import Foundation
 import SwiftyJSON
 import ZTJSON
 #endif
-
+import ZTAPICore
+import ZTAPIParamMacro
 
 #if !canImport(ZTJSON)
 // MARK: - Models

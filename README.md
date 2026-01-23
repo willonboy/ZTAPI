@@ -1,8 +1,51 @@
 # ZTAPI
 
+## Fluent Chain DSL
+
+ZTAPI adopts **Fluent Interface / Builder pattern**, where all configuration methods return `Self` and are marked with `@discardableResult`:
+
+```swift
+import ZTAPI
+
+// Complete chain DSL example
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
+    .params(.kv("id", 123), .kv("include", "profile"))
+    .headers(.kv("Authorization", "Bearer xxx"))
+    .timeout(30)
+    .retry(ZTExponentialBackoffRetryPolicy(maxRetries: 3))
+    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .imageJPEG))
+    .uploadProgress { progress in
+        print("Upload progress: \(progress.fractionCompleted)")
+    }
+    .jsonDecoder { decoder in
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+    }
+    .plugins(logPlugin, authPlugin)
+    .response()
+```
+
+**DSL Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `.params(...)` | Add request parameters |
+| `.headers(...)` | Add HTTP headers |
+| `.encoding(...)` | Set parameter encoding |
+| `.body(...)` | Set raw request body |
+| `.upload(...)` | Upload file(s) |
+| `.multipart(...)` | Set multipart form |
+| `.timeout(...)` | Set timeout interval |
+| `.retry(...)` | Set retry policy |
+| `.uploadProgress(...)` | Upload progress callback |
+| `.jsonDecoder {...}` | Configure JSONDecoder |
+| `.plugins(...)` | Add plugins |
+
+---
+
 ZTAPI is a modern Swift networking library that goes beyond Moya. Through **enum modular encapsulation**, **XPath parsing**, and **macro auto-generation**, it provides a more powerful and concise API management solution than Moya.
 
-## Core Advantages
+## ZTAPICore Advantages
 
 | Feature          | ZTAPI                                | Moya                        |
 | ---------------- | ------------------------------------ | --------------------------- |
@@ -18,8 +61,66 @@ ZTAPI is a modern Swift networking library that goes beyond Moya. Through **enum
 
 ### Swift Package Manager
 
+**Full features (ZTAPICore + ZTAPIXPath + ZTAPIParamMacro):**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPI", package: "ZTAPI")  // Includes ZTAPICore + ZTAPIXPath + ZTAPIParamMacro
+        ]
+    )
+]
 ```
-https://github.com/willonboy/ZTAPI.git
+
+**ZTAPICore only (no third-party dependency):**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI")  // ZTAPICore features only
+        ]
+    )
+]
+```
+
+**ZTAPICore + ZTAPIParamMacro (with macro support):**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI"),
+            .product(name: "ZTAPIParamMacro", package: "ZTAPI")  // Enables @ZTAPIParam macro
+        ]
+    )
+]
+```
+
+**ZTAPICore + ZTAPIXPath (with XPath parsing):**
+```swift
+dependencies: [
+    .package(url: "https://github.com/willonboy/ZTAPI.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "ZTAPICore", package: "ZTAPI"),
+            .product(name: "ZTAPIXPath", package: "ZTAPI")  // Enables XPath parsing
+        ]
+    )
+]
 ```
 
 ### CocoaPods
@@ -142,11 +243,10 @@ do {
 
 ### 1. @ZTAPIParam Macro - Type-Safe Parameters
 
-Using `@ZTAPIParam` macro (requires ZTJSON) to generate type-safe parameters with automatic key mapping:
+Using `@ZTAPIParam` macro (requires ZTAPIParamMacro) to generate type-safe parameters with automatic key mapping:
 
 ```swift
-#if canImport(ZTJSON)
-import ZTJSON
+import ZTAPIParamMacro
 
 enum UserCenterAPI {
     static var baseUrl: String { "https://api.example.com" }
@@ -182,13 +282,12 @@ enum UserCenterAPI {
 // userId → "uid" (required, customized via @ZTAPIParamKey)
 //
 // isValid auto-validates: non-Optional parameters must exist, otherwise throws exception
-#endif
 ```
 
 **Compared to manual implementation:**
 
 ```swift
-// Manual implementation without ZTJSON
+// Manual implementation without macro
 enum UserAPIParam: ZTAPIParamProtocol {
     case userName(String)
     case password(String)
@@ -317,6 +416,8 @@ let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1")
 
 ### 4. Runtime XPath Parsing
 
+> XPath parsing extension is in `ZTAPIXPath` module (requires ZTJSON).
+
 Parse multiple XPath paths at runtime without defining models:
 
 ```swift
@@ -406,6 +507,7 @@ ZTAPI abstracts the underlying network implementation through `ZTAPIProvider` pr
 | `ZTAlamofireProvider`  | Alamofire-based                     | Alamofire    |
 | `ZTStubProvider`       | Mock for unit testing               | None         |
 | `ZTSSLPinningProvider` | SSL Certificate Pinning (URLSession)| None         |
+| `ZTAPICacheProvider`   | In-memory caching with policies     | None         |
 
 ```swift
 // Use shared provider
@@ -413,6 +515,68 @@ let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZT
 
 // Or with Alamofire
 let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: ZTAlamofireProvider.shared)
+
+// Or with Cache
+let cacheProvider = ZTAPICacheProvider(
+    baseProvider: ZTURLSessionProvider.shared,
+    readPolicy: .cacheElseNetwork,
+    cacheDuration: 300
+)
+let api = ZTAPI<ZTAPIKVParam>("https://api.example.com/data", .get, provider: cacheProvider)
+```
+
+### Cache Provider
+
+> Cache Provider implementation is in `ZTAPICacheProvider.swift` in the Demo project.
+
+The `ZTAPICacheProvider` wraps any provider and adds in-memory caching with configurable policies and LRU eviction:
+
+```swift
+// Create cache provider
+let cacheProvider = ZTAPICacheProvider(
+    baseProvider: ZTURLSessionProvider.shared,
+    readPolicy: .cacheElseNetwork,
+    cacheDuration: 300               // 5 minutes
+)
+
+// Use with ZTAPI
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .get, provider: cacheProvider)
+    .response()
+```
+
+**Cache Read Policies:**
+
+| Policy                | Description                              |
+| --------------------- | ---------------------------------------- |
+| `.networkOnly`        | Only fetch from network, ignore cache    |
+| `.cacheOnly`          | Only read from cache, error if miss      |
+| `.cacheElseNetwork`   | Try cache first, fallback to network     |
+| `.networkElseCache`   | Try network first, fallback to cache on error |
+
+**Cache Write Policies:**
+
+| Policy                | Description                              |
+| --------------------- | ---------------------------------------- |
+| `.never`              | Never write to cache                     |
+| `.always`             | Always write to cache                    |
+| `.onSuccess`          | Only write on successful responses (2xx) |
+
+**Cache Management:**
+
+```swift
+// Clear all cache
+await cacheProvider.clearCache()
+
+// Clear specific URL
+await cacheProvider.clearCache(url: "https://api.example.com/user/123")
+
+// Get cache statistics
+let stats = await cacheProvider.cacheStats
+print("Cache hit rate: \(stats.formattedHitRate)")
+print("Cache size: \(stats.formattedSize)")
+
+// Remove expired entries
+await cacheProvider.removeExpired()
 ```
 
 ### Plugin System
@@ -496,19 +660,19 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom")
 
 ### SSL Pinning
 
-> SSL Pinning implementations are in `ZTAPISecurityPlugin.swift` in the Demo project.
+> SSL Pinning implementations are in `ZTAPISecurityPlugin.swift` and `ZTAlamofireSecurityExtension.swift` in the Demo project.
 
 **URLSession SSL Pinning:**
 
 ```swift
 // Certificate Pinning
-let certificates = ZTCertificateLoader.load(from: "myserver")
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver") // Load myserver.cer from Bundle
 let provider = ZTSSLPinningProvider(mode: .certificate(certificates))
 
 // Public Key Pinning
-let certificates = ZTCertificateLoader.load(from: "myserver")
-let publicKeys = ZTCertificateLoader.publicKeys(from: certificates)
-let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeys))
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
+let publicKeyHashes = ZTCertificateLoader.publicKeyHashes(from: certificates)
+let provider = ZTSSLPinningProvider(mode: .publicKey(publicKeyHashes))
 
 // Disable validation (development only)
 let provider = ZTSSLPinningProvider(mode: .disabled)
@@ -516,16 +680,19 @@ let provider = ZTSSLPinningProvider(mode: .disabled)
 
 **Alamofire SSL Pinning:**
 
+> Note: Alamofire provider only supports certificate pinning. For public key pinning, use `ZTSSLPinningProvider`.
+
 ```swift
 import Alamofire
 
 // Certificate Pinning from Bundle
 let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
 
-// Public Key Pinning from Bundle
-let provider = ZTAlamofireProvider.publicKeyPinning(from: "myserver")
+// Or using pinning(mode:) directly
+let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
+let provider = ZTAlamofireProvider.pinning(mode: .certificate(certificates))
 
-// Disable validation (development only)
+// Disable validation (development only, DEBUG only)
 let provider = ZTAlamofireProvider.insecureProvider()
 ```
 
@@ -536,26 +703,17 @@ openssl s_client -connect api.example.com:443 -showcerts
 
 ### Concurrency Control
 
+> Global API Provider implementation is in `ZTAPIGlobalManager.swift` in the Demo project.
+
+The global provider comes pre-configured with Alamofire and a concurrency limit of 6:
+
 ```swift
-// Configure global Provider
-await ZTGlobalAPIProviderStore.shared.configure(
-    baseProvider: ZTURLSessionProvider(),
-    maxConcurrency: 6
-)
-
-// Get global Provider
-let globalProvider = await ZTGlobalAPIProviderStore.shared.get()
-
-// Read current concurrency limit
-let currentMax = await globalProvider.currentMaxConcurrency
-
-// Modify concurrency limit
-await globalProvider.setMaxConcurrency(10)
-
-// Use global Provider in ZTAPI
+// Use global Provider directly (no configuration needed)
 let result = try await ZTAPI<ZTAPIKVParam>.global("https://api.example.com/data")
     .response()
 ```
+
+To customize the global provider (e.g., use URLSession or different concurrency limit), modify the `ZTAPIGlobalManager.provider` in the Demo project.
 
 ### Combine Support
 
@@ -669,10 +827,11 @@ public enum ZTHTTPMethod: Sendable {
 
 ## Optional Dependencies
 
-| Library    | Usage                                      |
-| ---------- | ------------------------------------------ |
+| Library       | Usage                                      |
+| ------------- | ------------------------------------------ |
 | **Alamofire** | Use `ZTAlamofireProvider`                 |
-| **ZTJSON**  | `@ZTAPIParam` macro, XPath parsing         |
+| **ZTJSON**    | XPath parsing                               |
+| **SwiftyJSON**| Required by `ZTAPIXPath` product        |
 
 > Note: Built-in Plugin and Provider implementations are in the Demo project. Copy them to your project as needed.
 
