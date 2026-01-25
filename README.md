@@ -586,9 +586,9 @@ The plugin system provides 4 hooks for request/response interception:
 ```swift
 protocol ZTAPIPlugin: Sendable {
     func willSend(_ request: inout URLRequest) async throws
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
-    func didCatch(_ error: Error) async throws
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
+    func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws
+    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws
+    func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data
 }
 ```
 
@@ -767,8 +767,13 @@ public struct ZTAPIError: Error {
 | `invalidParams`        | 80002 | Invalid request parameters       |
 | `invalidResponse`      | 80003 | Invalid response type            |
 | `emptyResponse`        | 80004 | Empty response                   |
+| `uploadRequiresBody`   | 80005 | Upload requires httpBody         |
+| `invalidJSONObject`    | 81001 | Params contain non-JSON-serializable objects |
 | `jsonEncodingFailed`   | 81002 | JSON encoding failed             |
 | `jsonParseFailed`      | 81003 | JSON parsing failed              |
+| `invalidResponseFormat`| 81004 | Invalid response format          |
+| `unsupportedPayloadType`| 81005 | Unsupported payload type         |
+| `fileReadFailed`       | 83001 | Failed to read file              |
 | `xpathParseFailed`     | 82001 | XPath parsing failed             |
 
 ---

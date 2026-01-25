@@ -65,8 +65,18 @@ public extension ZTAPIError {
     /// Invalid response type
     static var invalidResponse: ZTAPIError { ZTAPIError(80003, "Invalid response type") }
 
+    /// Invalid response type with associated HTTP response
+    static func invalidResponse(httpResponse: HTTPURLResponse?) -> ZTAPIError {
+        ZTAPIError(80003, "Invalid response type", httpResponse: httpResponse)
+    }
+
     /// Empty response
     static var emptyResponse: ZTAPIError { ZTAPIError(80004, "Empty response") }
+
+    /// Empty response with associated HTTP response
+    static func emptyResponse(httpResponse: HTTPURLResponse?) -> ZTAPIError {
+        ZTAPIError(80004, "Empty response", httpResponse: httpResponse)
+    }
 
     /// Upload requires httpBody
     static var uploadRequiresBody: ZTAPIError { ZTAPIError(80005, "Upload requires httpBody") }
@@ -77,17 +87,22 @@ public extension ZTAPIError {
     static var invalidJSONObject: ZTAPIError { ZTAPIError(81001, "Params contain non-JSON-serializable objects") }
 
     /// JSON encoding failed
-    static func jsonEncodingFailed(_ message: String = "JSON encoding failed") -> ZTAPIError {
-        ZTAPIError(81002, message)
+    static func jsonEncodingFailed(_ message: String = "JSON encoding failed", httpResponse: HTTPURLResponse? = nil) -> ZTAPIError {
+        ZTAPIError(81002, message, httpResponse: httpResponse)
     }
 
     /// JSON parsing failed
-    static func jsonParseFailed(_ message: String = "JSON parse failed") -> ZTAPIError {
-        ZTAPIError(81003, message)
+    static func jsonParseFailed(_ message: String = "JSON parse failed", httpResponse: HTTPURLResponse? = nil) -> ZTAPIError {
+        ZTAPIError(81003, message, httpResponse: httpResponse)
     }
 
     /// Invalid response format
     static var invalidResponseFormat: ZTAPIError { ZTAPIError(81004, "Invalid response format") }
+
+    /// Invalid response format with associated HTTP response
+    static func invalidResponseFormat(httpResponse: HTTPURLResponse?) -> ZTAPIError {
+        ZTAPIError(81004, "Invalid response format", httpResponse: httpResponse)
+    }
 
     /// Unsupported payload type
     static var unsupportedPayloadType: ZTAPIError { ZTAPIError(81005, "Unsupported payload type") }

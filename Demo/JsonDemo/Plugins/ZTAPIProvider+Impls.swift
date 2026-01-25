@@ -50,7 +50,18 @@ private actor UploadTaskState {
         finished = true
 
         if let error {
-            continuation.resume(throwing: error)
+            // If response exists, attach it to the error for retry policy
+            let httpResponse = response.flatMap { $0 as? HTTPURLResponse }
+            if let httpResponse {
+                let wrappedError = ZTAPIError(
+                    (error as NSError).code,
+                    error.localizedDescription,
+                    httpResponse: httpResponse
+                )
+                continuation.resume(throwing: wrappedError)
+            } else {
+                continuation.resume(throwing: error)
+            }
             return
         }
 
@@ -69,14 +80,11 @@ private actor UploadTaskState {
 
 // MARK: - Upload Delegate
 
-private final class UploadDelegate: NSObject,
-    URLSessionTaskDelegate,
-    URLSessionDataDelegate {
-
+private final class UploadDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate {
     private let state: UploadTaskState
     private let progressHandler: ZTUploadProgressHandler?
 
-    init(state: UploadTaskState, progressHandler: ZTUploadProgressHandler?) {
+    init(state: UploadTaskState, progressHandler: ZTUploadProgressHandler? = nil) {
         self.state = state
         self.progressHandler = progressHandler
     }
@@ -101,11 +109,8 @@ private final class UploadDelegate: NSObject,
         }
     }
 
-    func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
-        didReceive data: Data
-    ) {
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
+        didReceive data: Data) {
         Task {
             await state.append(data)
         }
@@ -123,11 +128,8 @@ private final class UploadDelegate: NSObject,
         completionHandler(.allow)
     }
 
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didCompleteWithError error: Error?
-    ) {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+        didCompleteWithError error: Error?) {
         Task {
             await state.finish(error: error)
         }
@@ -137,7 +139,6 @@ private final class UploadDelegate: NSObject,
 // MARK: - Upload Executor
 
 private enum URLSessionUploadExecutor {
-
     static func upload(
         baseSession: URLSession,
         request: URLRequest,
@@ -147,27 +148,15 @@ private enum URLSessionUploadExecutor {
 
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-
-                let state = UploadTaskState(
-                    continuation: continuation
-                )
-
-                let delegate = UploadDelegate(
-                    state: state,
-                    progressHandler: progress
-                )
+                let state = UploadTaskState(continuation: continuation)
+                let delegate = UploadDelegate(state: state, progressHandler: progress)
 
                 let session = URLSession(
                     configuration: baseSession.configuration,
                     delegate: delegate,
                     delegateQueue: nil
                 )
-
-                let task = session.uploadTask(
-                    with: request,
-                    from: body
-                )
-
+                let task = session.uploadTask(with: request, from: body)
                 task.resume()
             }
         } onCancel: {
@@ -183,18 +172,28 @@ private enum URLSessionUploadExecutor {
 /// - If NSError (including URLError etc.), extract code and localizedDescription to build ZTAPIError
 /// - If already ZTAPIError, return directly
 /// - Other error types are thrown as-is, let users handle via ZTTransferErrorPlugin
-private func convertSystemError(_ error: Error) -> Error {
+private func convertSystemError(_ error: Error, httpResponse: HTTPURLResponse? = nil) -> Error {
     // Already ZTAPIError, return directly
     if let apiError = error as? ZTAPIError {
         return apiError
     }
 
-    // NSError and its subclasses (URLError etc.)
+    // URLError may contain HTTPURLResponse
+    if let urlError = error as? URLError {
+        return ZTAPIError(
+            urlError.code.rawValue,
+            urlError.localizedDescription,
+            httpResponse: httpResponse
+        )
+    }
+
+    // NSError and its subclasses
     if type(of: error) is NSError.Type {
         let nsError = error as NSError
         return ZTAPIError(
             nsError.code,
-            nsError.localizedDescription
+            nsError.localizedDescription,
+            httpResponse: httpResponse
         )
     }
 
@@ -228,11 +227,12 @@ public final class ZTURLSessionProvider: @unchecked Sendable, ZTAPIProvider {
                         progress: uploadProgress
                     )
             } else {
-                (data, response) = try await
-                    session.data(for: urlRequest)
+                (data, response) = try await session.data(for: urlRequest)
             }
         } catch {
-            throw convertSystemError(error)
+            // Error may already contain httpResponse from UploadTaskState.finish (for upload requests)
+            let httpResponse = (error as? ZTAPIError)?.httpResponse
+            throw convertSystemError(error, httpResponse: httpResponse)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -285,7 +285,7 @@ public final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
             }
             return req
         }()
-        
+
         try Task.checkCancellation()
         // Send request and get complete response
         let dataResponse = await withTaskCancellationHandler {
@@ -299,9 +299,9 @@ public final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
         // Check if there are errors
         guard let data = dataResponse.value else {
             if let error = dataResponse.error {
-                throw error
+                throw convertSystemError(error, httpResponse: dataResponse.response)
             }
-            throw ZTAPIError.emptyResponse
+            throw ZTAPIError.emptyResponse(httpResponse: dataResponse.response)
         }
 
         // Check if status code is in error range

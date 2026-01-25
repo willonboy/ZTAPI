@@ -738,7 +738,7 @@ class ZTAPITests {
     func testPluginProcessHook() async {
         await runTest("testPluginProcessHook") {
             struct UpperCaseValuePlugin: ZTAPIPlugin {
-                func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+                func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
                     guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                         return data
                     }

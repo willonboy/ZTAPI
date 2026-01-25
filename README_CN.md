@@ -586,9 +586,9 @@ await cacheProvider.removeExpired()
 ```swift
 protocol ZTAPIPlugin: Sendable {
     func willSend(_ request: inout URLRequest) async throws
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
-    func didCatch(_ error: Error) async throws
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
+    func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws
+    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws
+    func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data
 }
 ```
 
@@ -761,15 +761,20 @@ public struct ZTAPIError: Error {
 
 ### 内置错误
 
-| 错误                 | 错误码 | 说明                |
-| -------------------- | ------ | ------------------- |
-| `invalidURL`         | 80001  | URL 为空            |
-| `invalidParams`      | 80002  | 请求参数无效        |
-| `invalidResponse`    | 80003  | 响应类型无效        |
-| `emptyResponse`      | 80004  | 响应为空            |
-| `jsonEncodingFailed` | 81002  | JSON 编码失败       |
-| `jsonParseFailed`    | 81003  | JSON 解析失败       |
-| `xpathParseFailed`   | 82001  | XPath 解析失败      |
+| 错误                  | 错误码 | 说明                |
+| --------------------- | ------ | ------------------- |
+| `invalidURL`          | 80001  | URL 为空            |
+| `invalidParams`       | 80002  | 请求参数无效        |
+| `invalidResponse`     | 80003  | 响应类型无效        |
+| `emptyResponse`       | 80004  | 响应为空            |
+| `uploadRequiresBody`  | 80005  | 上传需要 httpBody    |
+| `invalidJSONObject`   | 81001  | 参数含非 JSON 可序列化对象 |
+| `jsonEncodingFailed`  | 81002  | JSON 编码失败       |
+| `jsonParseFailed`     | 81003  | JSON 解析失败       |
+| `invalidResponseFormat`| 81004 | 响应格式无效        |
+| `unsupportedPayloadType`| 81005 | 不支持的载荷类型    |
+| `fileReadFailed`      | 83001  | 文件读取失败        |
+| `xpathParseFailed`    | 82001  | XPath 解析失败      |
 
 ---
 

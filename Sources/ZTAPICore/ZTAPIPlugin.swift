@@ -26,18 +26,18 @@ import Foundation
 public protocol ZTAPIPlugin: Sendable {
     /// Request about to be sent
     func willSend(_ request: inout URLRequest) async throws
-    /// Response received
-    func didReceive(_ response: HTTPURLResponse, data: Data) async throws
-    /// Error occurred
-    func didCatch(_ error: Error) async throws
+    /// Response received with request context
+    func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws
+    /// Error occurred with request context
+    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws
     /// Process response data, can modify returned data (after didReceive, before returning to caller)
-    func process(_ data: Data, response: HTTPURLResponse) async throws -> Data
+    func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data
 }
 
 /// Default empty implementation
 extension ZTAPIPlugin {
     public func willSend(_ request: inout URLRequest) async throws {}
-    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {}
-    public func didCatch(_ error: Error) async throws {}
-    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data { data }
+    public func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws {}
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {}
+    public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data { data }
 }

@@ -87,7 +87,7 @@ public struct ZTLogPlugin: ZTAPIPlugin {
         }
     }
 
-    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {
+    public func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws {
         guard level == .verbose else { return }
 
         var output = """
@@ -121,9 +121,13 @@ public struct ZTLogPlugin: ZTAPIPlugin {
         print(output)
     }
 
-    public func didCatch(_ error: Error) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
         guard level != .none else { return }
         print("[ZTAPI] Error: \(error)")
+        print("[ZTAPI] URL: \(request.url?.absoluteString ?? "nil")")
+        if let response = response {
+            print("[ZTAPI] Status: \(response.statusCode)")
+        }
     }
 }
 
@@ -192,7 +196,7 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
         // Can implement token expiration check here
     }
 
-    public func didCatch(_ error: Error) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
         if shouldRefresh(error) {
             do {
                 let newToken: String
@@ -213,7 +217,7 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
 
 /// JSON decode plugin - automatically parse response data as JSON and re-encode
 public struct ZTJSONDecodePlugin: ZTAPIPlugin {
-    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+    public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
         // Try to parse JSON, beautify then re-encode and return
         guard let json = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) else {
@@ -231,14 +235,14 @@ public struct ZTDecryptPlugin: ZTAPIPlugin {
         decrypt = handler
     }
     
-    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+    public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
         return decrypt(data)
     }
 }
 
 /// Response header injector plugin - example: add response header info to data
 public struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
-    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+    public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
         // Add response header info to JSON
         guard let json = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments]),
               let jsonObject = json as? [String: Any] else {
@@ -261,7 +265,7 @@ public struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
             // NSError subclass (JSONSerialization error)
             if type(of: error) is NSError.Type {
                 let nsError = error as NSError
-                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)")
+                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)", httpResponse: response)
             }
             throw error
         }
@@ -276,7 +280,7 @@ public struct ZTTransferErrorPlugin: ZTAPIPlugin {
         transfer = handler
     }
     
-    public func didCatch(_ error: Error) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
         throw transfer(error)
     }
 }
@@ -285,16 +289,16 @@ public struct ZTTransferErrorPlugin: ZTAPIPlugin {
 public struct ZTCheckRespOKPlugin: ZTAPIPlugin {
     public init() {}
 
-    public func didReceive(_ response: HTTPURLResponse, data: Data) async throws {
+    public func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws {
         // Only handle HTTP success case
         guard response.statusCode == 200 else {
-            throw ZTAPIError(response.statusCode, "HTTP error: \(response.statusCode)")
+            throw ZTAPIError(response.statusCode, "HTTP error: \(response.statusCode)", httpResponse: response)
         }
 
         let json: [String: Any]
         do {
             guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw ZTAPIError.invalidResponseFormat
+                throw ZTAPIError.invalidResponseFormat(httpResponse: response)
             }
             json = j
         } catch {
@@ -302,7 +306,7 @@ public struct ZTCheckRespOKPlugin: ZTAPIPlugin {
             // NSError subclass (JSONSerialization error)
             if type(of: error) is NSError.Type {
                 let nsError = error as NSError
-                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)")
+                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)", httpResponse: response)
             }
             throw error
         }
@@ -311,7 +315,7 @@ public struct ZTCheckRespOKPlugin: ZTAPIPlugin {
         // Check business code
         if code != "0" {
             let msg = json["message"] as? String
-            throw ZTAPIError(Int(code ?? "") ?? -999997, msg ?? "API returned unknown error")
+            throw ZTAPIError(Int(code ?? "") ?? -1, msg ?? "API returned unknown error", httpResponse: response)
         }
     }
 }
@@ -320,11 +324,11 @@ public struct ZTCheckRespOKPlugin: ZTAPIPlugin {
 public struct ZTReadPayloadPlugin: ZTAPIPlugin {
     public init() {}
 
-    public func process(_ data: Data, response: HTTPURLResponse) async throws -> Data {
+    public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
         let json: [String: Any]
         do {
             guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw ZTAPIError.invalidResponseFormat
+                throw ZTAPIError.invalidResponseFormat(httpResponse: response)
             }
             json = j
         } catch {
@@ -332,7 +336,7 @@ public struct ZTReadPayloadPlugin: ZTAPIPlugin {
             // NSError subclass (JSONSerialization error)
             if type(of: error) is NSError.Type {
                 let nsError = error as NSError
-                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)")
+                throw ZTAPIError(nsError.code, "JSON parse failed: \(nsError.localizedDescription)", httpResponse: response)
             }
             throw error
         }
@@ -356,7 +360,7 @@ public struct ZTReadPayloadPlugin: ZTAPIPlugin {
             // NSError subclass (JSONSerialization error)
             if type(of: error) is NSError.Type {
                 let nsError = error as NSError
-                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)")
+                throw ZTAPIError(nsError.code, "JSON encoding failed: \(nsError.localizedDescription)", httpResponse: response)
             }
             throw error
         }
