@@ -587,7 +587,7 @@ await cacheProvider.removeExpired()
 protocol ZTAPIPlugin: Sendable {
     func willSend(_ request: inout URLRequest) async throws
     func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws
-    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws
+    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws
     func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data
 }
 ```

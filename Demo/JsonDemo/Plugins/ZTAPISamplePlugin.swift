@@ -121,7 +121,7 @@ public struct ZTLogPlugin: ZTAPIPlugin {
         print(output)
     }
 
-    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws {
         guard level != .none else { return }
         print("[ZTAPI] Error: \(error)")
         print("[ZTAPI] URL: \(request.url?.absoluteString ?? "nil")")
@@ -196,7 +196,7 @@ public struct ZTTokenRefreshPlugin: ZTAPIPlugin {
         // Can implement token expiration check here
     }
 
-    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws {
         if shouldRefresh(error) {
             do {
                 let newToken: String
@@ -280,7 +280,7 @@ public struct ZTTransferErrorPlugin: ZTAPIPlugin {
         transfer = handler
     }
     
-    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws {
         throw transfer(error)
     }
 }

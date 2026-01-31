@@ -28,8 +28,8 @@ public protocol ZTAPIPlugin: Sendable {
     func willSend(_ request: inout URLRequest) async throws
     /// Response received with request context
     func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws
-    /// Error occurred with request context
-    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws
+    /// Error occurred with request context and optional response data
+    func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws
     /// Process response data, can modify returned data (after didReceive, before returning to caller)
     func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data
 }
@@ -38,6 +38,6 @@ public protocol ZTAPIPlugin: Sendable {
 extension ZTAPIPlugin {
     public func willSend(_ request: inout URLRequest) async throws {}
     public func didReceive(_ response: HTTPURLResponse, data: Data, request: URLRequest) async throws {}
-    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?) async throws {}
+    public func didCatch(_ error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws {}
     public func process(_ data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data { data }
 }

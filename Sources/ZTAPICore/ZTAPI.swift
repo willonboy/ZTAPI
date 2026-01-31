@@ -237,12 +237,14 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         }
 
         var httpResponse: HTTPURLResponse?
+        var responseData: Data?
         do {
             let (data, response) = try await effectiveProvider.request(
                 urlRequest,
                 uploadProgress: uploadProgressHandler
             )
             httpResponse = response
+            responseData = data
 
             // Execute didReceive plugins
             for plugin in plugins {
@@ -257,13 +259,13 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
 
             return processedData
         } catch {
-            // Execute didCatch plugins with request context
+            // Execute didCatch plugins with request context and optional response data
             // Priority: response from successful request > response in ZTAPIError > nil
             if httpResponse == nil {
                 httpResponse = (error as? ZTAPIError)?.httpResponse
             }
             for plugin in plugins {
-                try await plugin.didCatch(error, request: urlRequest, response: httpResponse)
+                try await plugin.didCatch(error, request: urlRequest, response: httpResponse, data: responseData)
             }
             throw error
         }
