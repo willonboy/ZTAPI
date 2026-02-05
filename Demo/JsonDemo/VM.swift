@@ -236,6 +236,29 @@ enum UserCenterAPI {
     }
 }
 
+// MARK: - ZTAPI Response Extension
+
+@MainActor
+extension ZTAPI {
+    /// Send request and return response as [String: Any] dictionary
+    public func responseDict() async throws -> [String: Any] {
+        let data = try await send()
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ZTAPIError.invalidResponseFormat
+        }
+        return json
+    }
+
+    /// Send request and return response as [[String: Any]] array
+    public func responseArr() async throws -> [[String: Any]] {
+        let data = try await send()
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ZTAPIError.invalidResponseFormat
+        }
+        return json
+    }
+}
+
 // MARK: - ViewModel
 
 @MainActor

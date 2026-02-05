@@ -327,17 +327,17 @@ public final class ZTAlamofireProvider: @unchecked Sendable, ZTAPIProvider {
 private extension ZTAPIError {
     /// Stub not found
     static func stubNotFound(_ key: String) -> ZTAPIError {
-        ZTAPIError(84001, "No stub found for: \(key)")
+        ZTAPIError(80040001, "No stub found for: \(key)")
     }
 
     /// Stub URL is nil
     static var stubURLNil: ZTAPIError {
-        ZTAPIError(84002, "Request URL is nil in stub provider")
+        ZTAPIError(80040002, "Request URL is nil in stub provider")
     }
 
     /// Stub failed to create HTTPURLResponse
     static var stubResponseCreationFailed: ZTAPIError {
-        ZTAPIError(84003, "Failed to create HTTPURLResponse for stub")
+        ZTAPIError(80040003, "Failed to create HTTPURLResponse for stub")
     }
 }
 

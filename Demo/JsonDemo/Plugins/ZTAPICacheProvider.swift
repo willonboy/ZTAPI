@@ -333,10 +333,10 @@ public struct CacheStats: Sendable {
 
 extension ZTAPIError {
     static var cacheNotFound: ZTAPIError {
-        ZTAPIError(83001, "Cache not found")
+        ZTAPIError(80030001, "Cache not found")
     }
 
     static var cacheExpired: ZTAPIError {
-        ZTAPIError(83002, "Cache expired")
+        ZTAPIError(80030002, "Cache expired")
     }
 }

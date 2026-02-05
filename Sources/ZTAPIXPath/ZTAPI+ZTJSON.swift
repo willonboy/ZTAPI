@@ -52,11 +52,11 @@ public struct ZTAPIParseConfig: Hashable {
 // MARK: - ZTAPI Error Extension
 
 public extension ZTAPIError {
-    /// XPath related errors 82000-82999
+    /// XPath related errors 80020000-80020999
 
     /// XPath parsing failed
     static func xpathParseFailed(_ xpath: String) -> ZTAPIError {
-        ZTAPIError(82001, "XPath parsing failed: path '\(xpath)' not found")
+        ZTAPIError(80020001, "XPath parsing failed: path '\(xpath)' not found")
     }
 }
 

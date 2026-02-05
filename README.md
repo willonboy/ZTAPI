@@ -763,18 +763,18 @@ public struct ZTAPIError: Error {
 
 | Error                  | Code  | Description                      |
 | ---------------------- | ----- | -------------------------------- |
-| `invalidURL`           | 80001 | URL is nil                       |
-| `invalidParams`        | 80002 | Invalid request parameters       |
-| `invalidResponse`      | 80003 | Invalid response type            |
-| `emptyResponse`        | 80004 | Empty response                   |
-| `uploadRequiresBody`   | 80005 | Upload requires httpBody         |
-| `invalidJSONObject`    | 81001 | Params contain non-JSON-serializable objects |
-| `jsonEncodingFailed`   | 81002 | JSON encoding failed             |
-| `jsonParseFailed`      | 81003 | JSON parsing failed              |
-| `invalidResponseFormat`| 81004 | Invalid response format          |
-| `unsupportedPayloadType`| 81005 | Unsupported payload type         |
-| `fileReadFailed`       | 83001 | Failed to read file              |
-| `xpathParseFailed`     | 82001 | XPath parsing failed             |
+| `invalidURL`           | 80000001 | URL is nil                       |
+| `invalidParams`        | 80000002 | Invalid request parameters       |
+| `invalidResponse`      | 80000003 | Invalid response type            |
+| `emptyResponse`        | 80000004 | Empty response                   |
+| `uploadRequiresBody`   | 80000005 | Upload requires httpBody         |
+| `invalidJSONObject`    | 80010001 | Params contain non-JSON-serializable objects |
+| `jsonEncodingFailed`   | 80010002 | JSON encoding failed             |
+| `jsonParseFailed`      | 80010003 | JSON parsing failed              |
+| `invalidResponseFormat`| 80010004 | Invalid response format          |
+| `unsupportedPayloadType`| 80010005 | Unsupported payload type         |
+| `fileReadFailed`       | 80030001 | Failed to read file              |
+| `xpathParseFailed`     | 80020001 | XPath parsing failed             |
 
 ---
 
