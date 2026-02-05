@@ -138,30 +138,69 @@ private final class UploadDelegate: NSObject, URLSessionTaskDelegate, URLSession
 
 // MARK: - Upload Executor
 
-private enum URLSessionUploadExecutor {
+private actor URLSessionUploadExecutor {
+    private var session: URLSession?
+    private var task: URLSessionUploadTask?
+
+    func upload(
+        baseSession: URLSession,
+        request: URLRequest,
+        body: Data,
+        progress: ZTUploadProgressHandler?
+    ) async throws -> (Data, URLResponse) {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let state = UploadTaskState(continuation: continuation)
+                let delegate = UploadDelegate(state: state, progressHandler: progress)
+
+                let newSession = URLSession(
+                    configuration: baseSession.configuration,
+                    delegate: delegate,
+                    delegateQueue: nil
+                )
+                self.session = newSession
+
+                let uploadTask = newSession.uploadTask(with: request, from: body)
+                self.task = uploadTask
+                uploadTask.resume()
+            }
+        } onCancel: {
+            Task {
+                await self.cancel()
+            }
+        }
+    }
+
+    func cancel() {
+        task?.cancel()
+        session?.invalidateAndCancel()
+    }
+
+    func finish() {
+        session?.finishTasksAndInvalidate()
+    }
+}
+
+private extension URLSessionUploadExecutor {
     static func upload(
         baseSession: URLSession,
         request: URLRequest,
         body: Data,
         progress: ZTUploadProgressHandler?
     ) async throws -> (Data, URLResponse) {
-
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                let state = UploadTaskState(continuation: continuation)
-                let delegate = UploadDelegate(state: state, progressHandler: progress)
-
-                let session = URLSession(
-                    configuration: baseSession.configuration,
-                    delegate: delegate,
-                    delegateQueue: nil
-                )
-                let task = session.uploadTask(with: request, from: body)
-                task.resume()
-            }
-        } onCancel: {
-            // Cancel and terminate session directly
-            // delegate will receive cancelled error
+        let executor = URLSessionUploadExecutor()
+        do {
+            let result = try await executor.upload(
+                baseSession: baseSession,
+                request: request,
+                body: body,
+                progress: progress
+            )
+            await executor.finish()
+            return result
+        } catch {
+            await executor.finish()
+            throw error
         }
     }
 }

@@ -195,28 +195,38 @@ public struct ZTMultipartFormData: Sendable {
         let line = "\r\n"
         let boundaryLine = "--\(boundary)\r\n"
 
+        guard let lineData = line.data(using: .utf8),
+              let boundaryLineData = boundaryLine.data(using: .utf8),
+              let endBoundaryData = "--\(boundary)--\r\n".data(using: .utf8) else {
+            throw ZTAPIError.jsonEncodingFailed("Failed to encode multipart boundary")
+        }
+
         for part in parts {
-            body.append(boundaryLine.data(using: .utf8)!)
+            body.append(boundaryLineData)
 
             // Content-Disposition header
             var disposition = "Content-Disposition: form-data; name=\"\(part.name)\""
             if let fileName = part.fileName {
                 disposition += "; filename=\"\(fileName)\""
             }
-            body.append(disposition.data(using: .utf8)!)
-            body.append(line.data(using: .utf8)!)
+            guard let dispositionData = disposition.data(using: .utf8),
+                  let contentTypeData = "Content-Type: \(part.mimeType.rawValue)".data(using: .utf8) else {
+                throw ZTAPIError.jsonEncodingFailed("Failed to encode multipart headers")
+            }
+            body.append(dispositionData)
+            body.append(lineData)
 
             // Content-Type (optional)
-            body.append("Content-Type: \(part.mimeType.rawValue)".data(using: .utf8)!)
-            body.append(line.data(using: .utf8)!)
+            body.append(contentTypeData)
+            body.append(lineData)
 
-            body.append(line.data(using: .utf8)!)
+            body.append(lineData)
             body.append(try part.provider.getData())
-            body.append(line.data(using: .utf8)!)
+            body.append(lineData)
         }
 
         // End boundary
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(endBoundaryData)
 
         return body
     }

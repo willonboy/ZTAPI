@@ -282,7 +282,8 @@ public actor ZTAPICacheProvider: ZTAPIProvider {
 
     /// Clear cached data for a specific URL
     public func clearCache(url: String) {
-        var request = URLRequest(url: URL(string: url)!)
+        guard let url = URL(string: url) else { return }
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         let key = config.cacheKeyGenerator(request)
         clearCache(key: key)

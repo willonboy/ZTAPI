@@ -37,6 +37,9 @@ public protocol ZTAPIProvider: Sendable {
 
 /// Provider retry wrapper (request-level retry, internal use)
 final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
+    /// Maximum hard limit for retry attempts to prevent infinite loops
+    private static let maxRetryHardLimit = 100
+
     private let baseProvider: any ZTAPIProvider
     private let retryPolicy: any ZTAPIRetryPolicy
 
@@ -48,7 +51,7 @@ final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
     func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse) {
         var attempt = 0
 
-        while true {
+        while attempt < Self.maxRetryHardLimit {
             try Task.checkCancellation()
 
             do {
@@ -62,6 +65,15 @@ final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
                 }
 
                 attempt += 1
+
+                // Hard limit check to prevent infinite loops from buggy retry policies
+                guard attempt < Self.maxRetryHardLimit else {
+                    throw ZTAPIError(
+                        80000006,
+                        "Exceeded maximum retry limit (\(Self.maxRetryHardLimit))",
+                        httpResponse: (error as? ZTAPIError)?.httpResponse
+                    )
+                }
 
                 // Try to get associated HTTPURLResponse from ZTAPIError
                 let httpResponse = (error as? ZTAPIError)?.httpResponse
@@ -86,5 +98,8 @@ final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
                 )
             }
         }
+
+        // This should never be reached, but added for compiler safety
+        throw ZTAPIError(80000006, "Retry loop exited unexpectedly")
     }
 }
