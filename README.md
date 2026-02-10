@@ -10,16 +10,12 @@ import ZTAPI
 // Complete chain DSL example
 let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
     .params(.kv("id", 123), .kv("include", "profile"))
-    .headers(.kv("Authorization", "Bearer xxx"))
+    .headers(.h(key: "Authorization", value: "Bearer xxx"))
     .timeout(30)
-    .retry(ZTExponentialBackoffRetryPolicy(maxRetries: 3))
-    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .imageJPEG))
+    .retry(ZTExponentialBackoffRetryPolicy(maxAttempts: 3))
+    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg))
     .uploadProgress { progress in
         print("Upload progress: \(progress.fractionCompleted)")
-    }
-    .jsonDecoder { decoder in
-        decoder.dateDecodingStrategy = .iso8601
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
     .plugins(logPlugin, authPlugin)
     .response()
@@ -38,7 +34,6 @@ let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", 
 | `.timeout(...)` | Set timeout interval |
 | `.retry(...)` | Set retry policy |
 | `.uploadProgress(...)` | Upload progress callback |
-| `.jsonDecoder {...}` | Configure JSONDecoder |
 | `.plugins(...)` | Add plugins |
 
 ---
@@ -206,7 +201,7 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .
 
 ```swift
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .headers(.h("Authorization", "Bearer token123"), .h("Accept", "application/json"))
+    .headers(.h(key: "Authorization", value: "Bearer token123"), .h(key: "Accept", value: "application/json"))
     .timeout(30)
     .response()
 ```
@@ -219,6 +214,20 @@ let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data").send()
 
 // Get raw String
 let text = String(decoding: data, as: UTF8.self)
+```
+
+### Dictionary Response
+
+Get response as dictionary without defining models:
+
+```swift
+// Get as [String: Any] dictionary
+let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+    .responseDict()
+
+// Access fields
+dict["name"] as? String
+dict["age"] as? Int
 ```
 
 ### Error Handling
@@ -717,6 +726,8 @@ To customize the global provider (e.g., use URLSession or different concurrency 
 
 ### Combine Support
 
+> Note: `publisher()` is provided via `ZTAPI+Extension.swift` in the Demo project. Copy it to your project to use Combine support.
+
 ```swift
 import Combine
 
@@ -792,12 +803,13 @@ public struct ZTAPIError: Error {
 | `timeout(_:)`         | Set timeout                              |
 | `retry(_:)`           | Set retry policy                         |
 | `uploadProgress(_:)`  | Set upload progress callback             |
-| `jsonDecoder(_:)`     | Configure JSON decoder                   |
 | `plugins(_:)`         | Add plugins                              |
 | `send()`              | Send request, return Data                |
 | `response()`          | Send request, return Codable object      |
+| `responseDict()`      | Send request, return [String: Any]       |
+| `responseArr()`       | Send request, return [[String: Any]]     |
 | `parseResponse(_:)`   | Send request, XPath parsing (requires ZTJSON) |
-| `publisher()`         | Return Combine Publisher                 |
+| `publisher()`         | Return Combine Publisher (requires extension) |
 
 ### HTTP Methods
 

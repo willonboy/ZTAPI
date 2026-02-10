@@ -10,16 +10,12 @@ import ZTAPI
 // 完整的链式 DSL 示例
 let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
     .params(.kv("id", 123), .kv("include", "profile"))
-    .headers(.kv("Authorization", "Bearer xxx"))
+    .headers(.h(key: "Authorization", value: "Bearer xxx"))
     .timeout(30)
-    .retry(ZTExponentialBackoffRetryPolicy(maxRetries: 3))
-    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .imageJPEG))
+    .retry(ZTExponentialBackoffRetryPolicy(maxAttempts: 3))
+    .upload(.data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg))
     .uploadProgress { progress in
         print("上传进度: \(progress.fractionCompleted)")
-    }
-    .jsonDecoder { decoder in
-        decoder.dateDecodingStrategy = .iso8601
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
     .plugins(logPlugin, authPlugin)
     .response()
@@ -38,7 +34,6 @@ let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", 
 | `.timeout(...)` | 设置超时时间 |
 | `.retry(...)` | 设置重试策略 |
 | `.uploadProgress(...)` | 上传进度回调 |
-| `.jsonDecoder {...}` | 配置 JSONDecoder |
 | `.plugins(...)` | 添加插件 |
 
 ---
@@ -206,7 +201,7 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .
 
 ```swift
 let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
-    .headers(.h("Authorization", "Bearer token123"), .h("Accept", "application/json"))
+    .headers(.h(key: "Authorization", value: "Bearer token123"), .h(key: "Accept", value: "application/json"))
     .timeout(30)
     .response()
 ```
@@ -219,6 +214,20 @@ let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data").send()
 
 // 获取原始 String
 let text = String(decoding: data, as: UTF8.self)
+```
+
+### 字典响应
+
+无需定义模型即可获取字典格式响应：
+
+```swift
+// 获取 [String: Any] 字典
+let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+    .responseDict()
+
+// 访问字段
+dict["name"] as? String
+dict["age"] as? Int
 ```
 
 ### 错误处理
@@ -717,6 +726,8 @@ let result = try await ZTAPI<ZTAPIKVParam>.global("https://api.example.com/data"
 
 ### Combine 支持
 
+> 注意：`publisher()` 方法通过 Demo 工程中的 `ZTAPI+Extension.swift` 扩展提供，如需使用请复制该文件到你的工程中。
+
 ```swift
 import Combine
 
@@ -792,12 +803,13 @@ public struct ZTAPIError: Error {
 | `timeout(_:)`       | 设置超时                     |
 | `retry(_:)`         | 设置重试策略                 |
 | `uploadProgress(_:)` | 设置上传进度回调             |
-| `jsonDecoder(_:)`   | 配置 JSON 解码器             |
 | `plugins(_:)`       | 添加插件                     |
 | `send()`            | 发送请求，返回 Data          |
 | `response()`        | 发送请求，返回 Codable 对象  |
+| `responseDict()`    | 发送请求，返回 [String: Any] |
+| `responseArr()`     | 发送请求，返回 [[String: Any]] |
 | `parseResponse(_:)` | 发送请求，XPath 解析（需 ZTJSON） |
-| `publisher()`       | 返回 Combine Publisher       |
+| `publisher()`       | 返回 Combine Publisher（需扩展）|
 
 ### HTTP 方法
 
