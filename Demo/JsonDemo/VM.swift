@@ -140,7 +140,14 @@ enum UserCenterAPI {
                 .timeout(30)
                 .plugins(
                     ZTAuthPlugin { "TOKEN" },
-                    ZTLogPlugin(level: .simple)
+                    ZTLogPlugin(level: .simple),
+                    ZTTransferErrorPlugin { err in
+                        if let e = err as? ZTAPIError {
+                            e.nserr
+                        } else {
+                            err
+                        }
+                    }
                 )
         }
         
@@ -236,29 +243,6 @@ enum UserCenterAPI {
     }
 }
 
-// MARK: - ZTAPI Response Extension
-
-@MainActor
-extension ZTAPI {
-    /// Send request and return response as [String: Any] dictionary
-    public func responseDict() async throws -> [String: Any] {
-        let data = try await send()
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ZTAPIError.invalidResponseFormat
-        }
-        return json
-    }
-
-    /// Send request and return response as [[String: Any]] array
-    public func responseArr() async throws -> [[String: Any]] {
-        let data = try await send()
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw ZTAPIError.invalidResponseFormat
-        }
-        return json
-    }
-}
-
 // MARK: - ViewModel
 
 @MainActor
@@ -281,9 +265,9 @@ class VM {
                 .params(.kv("user_name", "jack"))
                 .headers(.contentType)
                 .response()
-                print("✅ Success: \(user.name)")
+                print("Success: \(user.name)")
             } catch {
-                print("❌ Error: \(error.localizedDescription)")
+                print("Error: \(error.localizedDescription)")
             }
         }
     }
@@ -296,9 +280,9 @@ class VM {
                 provider: ZTURLSessionProvider.shared
             )
             .response()
-            print("✅ URLSessionProvider test success: \(user.name)")
+            print("URLSessionProvider test success: \(user.name)")
         } catch {
-            print("❌ URLSessionProvider test failed: \(error)")
+            print("URLSessionProvider test failed: \(error)")
         }
     }
 
@@ -311,9 +295,9 @@ class VM {
             let data: Data = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(.data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg))
                 .send()
-            print("✅ Upload single Data success, response: \(data.count) bytes")
+            print("Upload single Data success, response: \(data.count) bytes")
         } catch {
-            print("❌ Upload Data failed: \(error)")
+            print("Upload Data failed: \(error)")
         }
 
         // Example 2: Upload single file
@@ -323,9 +307,9 @@ class VM {
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(.file(fileURL, name: "file", mimeType: .txt))
                 .send()
-            print("✅ Upload single file success")
+            print("Upload single file success")
         } catch {
-            print("❌ Upload file failed: \(error)")
+            print("Upload file failed: \(error)")
         }
 
         // Example 3: Upload multiple items (Data + File mixed)
@@ -340,9 +324,9 @@ class VM {
                         .file(fileURL1, name: "photos", mimeType: .jpeg),
                         .file(fileURL2, name: "photos", mimeType: .jpeg))
                 .send()
-            print("✅ Upload multiple items success (Data + File mixed)")
+            print("Upload multiple items success (Data + File mixed)")
         } catch {
-            print("❌ Upload multiple items failed: \(error)")
+            print("Upload multiple items failed: \(error)")
         }
 
         // Example 4: Use Multipart to upload files + form fields
@@ -355,9 +339,9 @@ class VM {
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload/multipart", .post, provider: ZTAlamofireProvider.shared)
                 .multipart(formData)
                 .send()
-            print("✅ Multipart upload success (files + form fields)")
+            print("Multipart upload success (files + form fields)")
         } catch {
-            print("❌ Multipart upload failed: \(error)")
+            print("Multipart upload failed: \(error)")
         }
 
         // Example 5: Use body() to set raw request body
@@ -366,9 +350,9 @@ class VM {
                 .body(Data("raw body data".utf8))
                 .headers(.h(key: "Content-Type", value: ZTMimeType.octetStream.rawValue))
                 .send()
-            print("✅ Upload raw data using body() success")
+            print("Upload raw data using body() success")
         } catch {
-            print("❌ Upload using body() failed: \(error)")
+            print("Upload using body() failed: \(error)")
         }
 
         // Example 6: Use custom MIME type
@@ -376,9 +360,9 @@ class VM {
             _ = try await ZTAPI<ZTAPIKVParam>("https://example.com/upload", .post, provider: ZTAlamofireProvider.shared)
                 .upload(.data(Data("custom data".utf8), name: "file", mimeType: .custom(ext:"", mime: "application/vnd.example")))
                 .send()
-            print("✅ Use custom MIME type success")
+            print("Use custom MIME type success")
         } catch {
-            print("❌ Use custom MIME type failed: \(error)")
+            print("Use custom MIME type failed: \(error)")
         }
     }
 
@@ -392,9 +376,9 @@ class VM {
                 provider: UserCenterAPI.stubProvider
             )
             .response()
-            print("✅ Stub test success: \(response.data?.count ?? 0) users")
+            print("Stub test success: \(response.data?.count ?? 0) users")
         } catch {
-            print("✅ Stub test err: \(error)")
+            print("Stub test err: \(error)")
         }
     }
 
@@ -406,10 +390,10 @@ class VM {
             let response: LoginResponse = try await UserCenterAPI.login(userName: "jack", password: "123456").response()
             if let token = response.data?.token {
                 self.token = token
-                print("✅ Login success, Token: \(token)")
+                print("Login success, Token: \(token)")
             }
         } catch {
-            print("❌ Login failed: \(error.localizedDescription)")
+            print("Login failed: \(error.localizedDescription)")
         }
     }
 
@@ -418,12 +402,12 @@ class VM {
             let response: UserInfoResponse = try await UserCenterAPI.userInfo(userId: "1384264339").response()
             if let data = response.data {
                 self.token = data.token
-                print("✅ Username: \(data.username)")
-                print("✅ Email: \(data.email)")
+                print("Username: \(data.username)")
+                print("Email: \(data.email)")
             }
-            print("✅ Get user info success")
+            print("Get user info success")
         } catch {
-            print("❌ Get user info failed: \(error.localizedDescription)")
+            print("Get user info failed: \(error.localizedDescription)")
         }
     }
 
@@ -432,24 +416,24 @@ class VM {
             // Method 1: If API returns array directly
             let users: [User] = try await UserCenterAPI.userList.response()
             self.userList = users
-            print("✅ Get user list success: \(users.count) users")
+            print("Get user list success: \(users.count) users")
             if let first = users.first {
                 print("   First user: \(first.name)")
             }
         } catch {
-            print("❌ Get user list failed: \(error.localizedDescription)")
+            print("Get user list failed: \(error.localizedDescription)")
         }
     }
 
     func fetchSingleUser() async {
         do {
             let user: User = try await UserCenterAPI.user(id: 1).response()
-            print("✅ Get single user success: \(user.name)")
+            print("Get single user success: \(user.name)")
             if let address = user.address {
                 print("   Address: \(address.city)")
             }
         } catch {
-            print("❌ Get single user failed: \(error.localizedDescription)")
+            print("Get single user failed: \(error.localizedDescription)")
         }
     }
 }

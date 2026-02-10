@@ -272,6 +272,19 @@ public struct ZTResponseHeaderInjectorPlugin: ZTAPIPlugin {
     }
 }
 
+
+public extension ZTAPIError {
+    var nserr: NSError {
+        NSError(
+            domain: "com.xm.err",
+            code: code,
+            userInfo: [
+                NSLocalizedDescriptionKey: localizedDescription
+            ]
+        )
+    }
+}
+
 // Sometimes there are different providers that may need to convert to upper-level Error types
 public struct ZTTransferErrorPlugin: ZTAPIPlugin {
     let transfer: @Sendable (Error) -> Error

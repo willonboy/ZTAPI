@@ -73,7 +73,6 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     private var requestTimeout: TimeInterval?
     private var requestRetryPolicy: (any ZTAPIRetryPolicy)?
     private var uploadProgressHandler: ZTUploadProgressHandler?
-    private var jsonDecoder: JSONDecoder = JSONDecoder()
 
     public init(_ url: String, _ method: ZTHTTPMethod = .get, provider: any ZTAPIProvider) {
         self.urlStr = url
@@ -175,20 +174,6 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         return self
     }
 
-    /* Example usage:
-        let user: User = try await ZTAPI<ZTAPIKVParam>(url)
-            .jsonDecoder { decoder in
-                decoder.dateDecodingStrategy = .formatted(dateFormatter)
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-            }.response()
-     */
-    /// Configure JSON decoder
-    @discardableResult
-    public func jsonDecoder(_ configure: (inout JSONDecoder) -> Void) -> Self {
-        configure(&jsonDecoder)
-        return self
-    }
-
     /// Add plugins
     @discardableResult
     public func plugins(_ ps: (any ZTAPIPlugin)...) -> Self {
@@ -199,6 +184,7 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     // MARK: - Send
 
     /// Send request and return raw Data
+    @discardableResult
     public func send() async throws -> Data {
         if P.isValid(params) == false {
             throw ZTAPIError.invalidParams
@@ -272,39 +258,10 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     }
     
     /// Send request and return decoded Codable object
+    @discardableResult
     public func response<T: Decodable>() async throws -> T {
         let data = try await send()
-        return try jsonDecoder.decode(T.self, from: data)
-    }
-
-    // MARK: - Publisher
-
-    /// Wrapper for safely passing Future.Promise across concurrency domains
-    private struct PromiseTransfer<T>: @unchecked Sendable {
-        let value: T
-    }
-
-    /// Send request and return Publisher of Codable type
-    public func publisher<T: Codable & Sendable>() -> AnyPublisher<T, Error> {
-        Deferred {
-            Future { promise in
-                let promiseTransfer = PromiseTransfer(value: promise)
-                Task {
-                    do {
-                        let result: T = try await self.response()
-                        await MainActor.run {
-                            promiseTransfer.value(.success(result))
-                        }
-                    } catch {
-                        await MainActor.run {
-                            promiseTransfer.value(.failure(error))
-                        }
-                    }
-                }
-            }
-        }
-        .share()
-        .eraseToAnyPublisher()
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
 #if DEBUG

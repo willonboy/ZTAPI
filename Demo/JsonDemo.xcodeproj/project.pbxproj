@@ -26,6 +26,7 @@
 		973C2C112F17EC1600043196 /* ZTAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 973C2C102F17EC1600043196 /* ZTAPITests.swift */; };
 		974596CA2F1FCDD3008FB437 /* ZTAPISamplePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974596C82F1FCDD3008FB437 /* ZTAPISamplePlugin.swift */; };
 		974596CB2F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */; };
+		97FCC8DE2F3B7BCE00349AF2 /* ZTAPI+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FCC8DD2F3B7BCE00349AF2 /* ZTAPI+Extension.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		973C2C102F17EC1600043196 /* ZTAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPITests.swift; sourceTree = "<group>"; };
 		974596C82F1FCDD3008FB437 /* ZTAPISamplePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZTAPISamplePlugin.swift; sourceTree = "<group>"; };
 		974596C92F1FCDD3008FB437 /* ZTAPIProvider+Impls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZTAPIProvider+Impls.swift"; sourceTree = "<group>"; };
+		97FCC8DD2F3B7BCE00349AF2 /* ZTAPI+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZTAPI+Extension.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +100,7 @@
 		7BC8AE8A2F23554700803A2C /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
+				97FCC8DD2F3B7BCE00349AF2 /* ZTAPI+Extension.swift */,
 				7BAF137A2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift */,
 				7BAF137B2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift */,
 				7BC8AE882F2342ED00803A2C /* ZTAPICacheProvider.swift */,
@@ -196,6 +199,7 @@
 				7B5A0E612D9BCF06007AEC15 /* Model.swift in Sources */,
 				7B5A0E622D9BCF06007AEC15 /* AppDelegate.swift in Sources */,
 				7BAF137C2F2260C4009A14B8 /* ZTAPISecurityPlugin.swift in Sources */,
+				97FCC8DE2F3B7BCE00349AF2 /* ZTAPI+Extension.swift in Sources */,
 				7BC8AE8E2F236C8900803A2C /* ZTAPIGlobalManager.swift in Sources */,
 				7BAF137D2F2260C4009A14B8 /* ZTAlamofireSecurityExtension.swift in Sources */,
 				7BA3BE0C2F166FCE0037DC68 /* VM.swift in Sources */,

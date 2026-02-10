@@ -97,20 +97,20 @@ class ZTAPITests {
     private func assertEqual<T: Equatable>(_ lhs: T, _ rhs: T, file: String = #file, line: Int = #line) {
         if lhs == rhs {
             passedCount += 1
-            log("  ✅ Assertion passed: \(lhs) == \(rhs)")
+            log("Assertion passed: \(lhs) == \(rhs)")
         } else {
             failedCount += 1
-            log("  ❌ Assertion failed: \(lhs) != \(rhs) (\(file):\(line))")
+            log("Assertion failed: \(lhs) != \(rhs) (\(file):\(line))")
         }
     }
 
     private func assertTrue(_ condition: Bool, _ message: String = "", file: String = #file, line: Int = #line) {
         if condition {
             passedCount += 1
-            log("  ✅ Assertion passed: \(message.isEmpty ? "true" : message)")
+            log("Assertion passed: \(message.isEmpty ? "true" : message)")
         } else {
             failedCount += 1
-            log("  ❌ Assertion failed: \(message) (\(file):\(line))")
+            log("Assertion failed: \(message) (\(file):\(line))")
         }
     }
 
@@ -118,10 +118,10 @@ class ZTAPITests {
         do {
             _ = try await block()
             failedCount += 1
-            log("  ❌ Assertion failed: expected error but got none (\(file):\(line))")
+            log("Assertion failed: expected error but got none (\(file):\(line))")
         } catch {
             passedCount += 1
-            log("  ✅ Assertion passed: correctly threw error - \(error)")
+            log("Assertion passed: correctly threw error - \(error)")
         }
     }
 
@@ -131,7 +131,7 @@ class ZTAPITests {
             try await test()
         } catch {
             failedCount += 1
-            log("  ❌ Test exception: \(error)")
+            log("Test exception: \(error)")
         }
     }
 
@@ -164,7 +164,7 @@ class ZTAPITests {
             "URL should contain limit=10"
         )
 
-        log("  Encoded URL: \(request.url?.absoluteString ?? "nil")")
+        log("Encoded URL: \(request.url?.absoluteString ?? "nil")")
     }
 
     /// Test ZTURLEncoding - POST request
@@ -186,7 +186,7 @@ class ZTAPITests {
             "application/x-www-form-urlencoded"
         )
 
-        log("  Encoded Body: \(bodyString)")
+        log("Encoded Body: \(bodyString)")
     }
 
     /// Test ZTJSONEncoding
@@ -208,10 +208,10 @@ class ZTAPITests {
            let json = try? JSON(data: body) {
             assertEqual(json["name"].stringValue, "John")
             assertEqual(json["age"].intValue, 30)
-            log("  Encoded JSON: \(json)")
+            log("Encoded JSON: \(json)")
         } else {
             failedCount += 1
-            log("  ❌ JSON encoding failed")
+            log("JSON encoding failed")
         }
     }
 
@@ -278,18 +278,18 @@ class ZTAPITests {
                 ZTAPIParseConfig("data/count", type: Int.self)
             )
 
-            log("  Parsed result count: \(results.count)")
+            log("Parsed result count: \(results.count)")
             if let success = results["success"] as? Bool {
-                log("  success: \(success)")
+                log("success: \(success)")
             }
             if let user = results["data/user"] as? String {
-                log("  user: \(user)")
+                log("user: \(user)")
             }
             if let token = results["data/token"] as? String {
-                log("  token: \(token)")
+                log("token: \(token)")
             }
             if let count = results["data/count"] as? Int {
-                log("  count: \(count)")
+                log("count: \(count)")
             }
 
             assertTrue(results.count == 4, "Should parse 4 fields")
@@ -312,7 +312,7 @@ class ZTAPITests {
         let part2 = item2.bodyPart
         assertEqual(part2.name, "image")
 
-        log("  ✅ ZTUploadItem test passed")
+        log("ZTUploadItem test passed")
     }
 
     /// Test using Codable for parsing
@@ -337,7 +337,7 @@ class ZTAPITests {
 
             assertTrue(response.success, "Response success should be true")
             assertEqual(response.message, "Hello from stub")
-            log("  Codable parsing success")
+            log("Codable parsing success")
         }
     }
 
@@ -359,7 +359,7 @@ class ZTAPITests {
             .send()
 
             assertEqual(data, Data("raw response data".utf8))
-            log("  Raw Data returned correctly")
+            log("Raw Data returned correctly")
         }
     }
 
@@ -406,7 +406,7 @@ class ZTAPITests {
 
             assertTrue(receivedResult != nil || receivedError != nil, "Should receive result or error")
             if let user = receivedResult {
-                log("  Publisher received response: \(user.name)")
+                log("Publisher received response: \(user.name)")
             }
 
             cancellable.cancel()
@@ -449,8 +449,8 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 100_000_000)
 
             assertTrue(firstCall, "First subscription should execute")
-            log("  First subscription: \(firstCall ? "executed" : "not executed")")
-            log("  Second subscription: \(secondCall ? "executed" : "not executed")")
+            log("First subscription: \(firstCall ? "executed" : "not executed")")
+            log("Second subscription: \(secondCall ? "executed" : "not executed")")
 
             p1.cancel()
             p2.cancel()
@@ -483,7 +483,7 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 100_000_000)
 
             assertTrue(provider.requestCount == 0, "Should not execute request without subscription")
-            log("  Request count without subscription: \(provider.requestCount)")
+            log("Request count without subscription: \(provider.requestCount)")
         }
     }
 
@@ -509,9 +509,9 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ Should timeout but didn't")
+                log("Should timeout but didn't")
             } catch {
-                log("  ✅ Correctly caught timeout error: \(error)")
+                log("Correctly caught timeout error: \(error)")
             }
         }
     }
@@ -541,9 +541,9 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ Should throw error but didn't")
+                log("Should throw error but didn't")
             } catch {
-                log("  ✅ Correctly caught error (retried): \(error)")
+                log("Correctly caught error (retried): \(error)")
             }
         }
     }
@@ -585,7 +585,7 @@ class ZTAPITests {
 
             assertEqual(response.result, "success")
             assertTrue(provider.callCount == 3, "Should retry 2 times then succeed, total 3 requests")
-            log("  ✅ Retry succeeded, total request count: \(provider.callCount)")
+            log("Retry succeeded, total request count: \(provider.callCount)")
         }
     }
 
@@ -613,10 +613,10 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ Should throw error")
+                log("Should throw error")
             } catch {
                 assertTrue(provider.callCount == 1, "Non-retryable error shouldn't trigger retry")
-                log("  ✅ Non-retryable error executed once, call count: \(provider.callCount)")
+                log("Non-retryable error executed once, call count: \(provider.callCount)")
             }
         }
     }
@@ -651,7 +651,7 @@ class ZTAPITests {
             } catch {
                 let elapsed = Date().timeIntervalSince(start)
                 assertTrue(elapsed < 2.0, "Should complete within timeout")
-                log("  ✅ Combined config test passed, elapsed: \(String(format: "%.2f", elapsed))s, call count: \(provider.callCount)")
+                log("Combined config test passed, elapsed: \(String(format: "%.2f", elapsed))s, call count: \(provider.callCount)")
             }
         }
     }
@@ -677,10 +677,10 @@ class ZTAPITests {
 
             do {
                 _ = try await api.send()
-                log("  ❌ Should throw error")
+                log("Should throw error")
             } catch {
                 assertTrue(provider.callCount == 1, "Should not retry without retry policy")
-                log("  ✅ No retry policy executed once, call count: \(provider.callCount)")
+                log("No retry policy executed once, call count: \(provider.callCount)")
             }
         }
     }
@@ -707,7 +707,7 @@ class ZTAPITests {
             let data = try await api.send()
             assertTrue(!data.isEmpty, "Should receive response")
 
-            log("  ✅ upload method test passed")
+            log("upload method test passed")
         }
     }
 
@@ -730,7 +730,7 @@ class ZTAPITests {
             let data = try await api.send()
             assertTrue(!data.isEmpty, "Should receive response")
 
-            log("  ✅ multipart method test passed")
+            log("multipart method test passed")
         }
     }
 
@@ -769,14 +769,14 @@ class ZTAPITests {
 
             // process hook will uppercase response value
             assertEqual(result.message, "HELLO WORLD")
-            log("  ✅ Plugin process hook test passed")
+            log("Plugin process hook test passed")
         }
     }
 
     /// Verify Token refresh concurrency safety
     func testChatGPT_TokenRefresh_ConcurrencyRace() async {
         await runTest("testChatGPT_TokenRefresh_ConcurrencyRace") {
-            log("  Verify: behavior of multiple concurrent requests triggering token refresh")
+            log("Verify: behavior of multiple concurrent requests triggering token refresh")
 
             actor RefreshCounter {
                 private(set) var refreshCount = 0
@@ -840,10 +840,10 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 200_000_000)
 
             let oldCounts = await counter.counts
-            log("  Without Actor: refresh called \(oldCounts.refresh) times, onRefresh called \(oldCounts.onRefresh) times")
+            log("Without Actor: refresh called \(oldCounts.refresh) times, onRefresh called \(oldCounts.onRefresh) times")
 
             if oldCounts.refresh > 1 {
-                log("  ✅ Confirmed: without Actor, concurrent race exists (multiple refreshes)")
+                log("Confirmed: without Actor, concurrent race exists (multiple refreshes)")
             }
 
             // Test new version with Actor
@@ -878,17 +878,17 @@ class ZTAPITests {
             try await Task.sleep(nanoseconds: 200_000_000)
 
             let newCounts = await newCounter.counts
-            log("  With Actor: refresh called \(newCounts.refresh) times, onRefresh called \(newCounts.onRefresh) times")
+            log("With Actor: refresh called \(newCounts.refresh) times, onRefresh called \(newCounts.onRefresh) times")
 
             if newCounts.refresh == 1 {
-                log("  ✅ Confirmed: with Actor, only refreshed once (single-flight mode effective)")
+                log("Confirmed: with Actor, only refreshed once (single-flight mode effective)")
                 passedCount += 1
             } else if newCounts.refresh < oldCounts.refresh {
-                log("  ✅ With Actor, refresh count significantly reduced (from \(oldCounts.refresh) to \(newCounts.refresh))")
+                log("With Actor, refresh count significantly reduced (from \(oldCounts.refresh) to \(newCounts.refresh))")
                 passedCount += 1
             }
 
-            log("  Conclusion: Fixed ZTTokenRefresher Actor effectively prevents concurrent refreshes")
+            log("Conclusion: Fixed ZTTokenRefresher Actor effectively prevents concurrent refreshes")
         }
     }
 
@@ -960,21 +960,21 @@ class ZTAPITests {
 
             let stats = await tracker.getStats()
 
-            log("  Completed requests: \(stats.completed)")
-            log("  Max concurrent: \(stats.max)")
+            log("Completed requests: \(stats.completed)")
+            log("Max concurrent: \(stats.max)")
 
             if stats.max <= 3 {
-                log("  ✅ Concurrency control normal: max concurrent \(stats.max), not exceeding limit 3")
+                log("Concurrency control normal: max concurrent \(stats.max), not exceeding limit 3")
                 passedCount += 1
             } else {
-                log("  ❌ Concurrency control failed: max concurrent \(stats.max), exceeds limit 3")
+                log("Concurrency control failed: max concurrent \(stats.max), exceeds limit 3")
                 failedCount += 1
             }
 
             if stats.completed == 10 {
-                log("  ✅ All requests completed")
+                log("All requests completed")
             } else {
-                log("  ⚠️  Some requests not completed: \(stats.completed)/10")
+                log("Some requests not completed: \(stats.completed)/10")
             }
         }
     }
@@ -986,7 +986,7 @@ class ZTAPITests {
             let provider = ZTAPIGlobalManager.provider
 
             // Verify provider is concurrency provider
-            log("  Global provider type: \(type(of: provider))")
+            log("Global provider type: \(type(of: provider))")
 
             // Test request (will fail due to network, but validates setup)
             do {
@@ -998,7 +998,7 @@ class ZTAPITests {
                 // Expected to fail, just testing provider setup
             }
 
-            log("  ✅ Global API Provider test passed")
+            log("Global API Provider test passed")
         }
     }
 
@@ -1045,22 +1045,22 @@ class ZTAPITests {
             _ = try await cacheProvider.request(request1, uploadProgress: nil)
             let count2 = await baseProvider.getCount()
 
-            log("  Network requests after first call: \(count1)")
-            log("  Network requests after second call: \(count2)")
+            log("Network requests after first call: \(count1)")
+            log("Network requests after second call: \(count2)")
 
             assertEqual(count1, 1)
             assertEqual(count2, 1)
 
             // Check cache stats
             let stats = await cacheProvider.cacheStats
-            log("  Cache hit rate: \(stats.formattedHitRate)")
-            log("  Cache entries: \(stats.entryCount)")
+            log("Cache hit rate: \(stats.formattedHitRate)")
+            log("Cache entries: \(stats.entryCount)")
 
             if stats.hits == 1 && stats.misses == 1 {
-                log("  ✅ Cache stats correct: 1 hit, 1 miss")
+                log("Cache stats correct: 1 hit, 1 miss")
                 passedCount += 1
             } else {
-                log("  ❌ Cache stats wrong: \(stats.hits) hits, \(stats.misses) misses")
+                log("Cache stats wrong: \(stats.hits) hits, \(stats.misses) misses")
                 failedCount += 1
             }
         }
@@ -1105,13 +1105,13 @@ class ZTAPITests {
 
             let count = await baseProvider.getCount()
 
-            log("  Network requests: \(count)")
+            log("Network requests: \(count)")
 
             if count == 2 {
-                log("  ✅ NetworkOnly policy: both requests hit network")
+                log("NetworkOnly policy: both requests hit network")
                 passedCount += 1
             } else {
-                log("  ❌ NetworkOnly policy failed")
+                log("NetworkOnly policy failed")
                 failedCount += 1
             }
         }
@@ -1162,14 +1162,14 @@ class ZTAPITests {
             _ = try await cacheProvider.request(request, uploadProgress: nil)
             let count2 = await baseProvider.getCount()
 
-            log("  Requests before expiry: \(count1)")
-            log("  Requests after expiry: \(count2)")
+            log("Requests before expiry: \(count1)")
+            log("Requests after expiry: \(count2)")
 
             if count2 == 2 {
-                log("  ✅ Cache expiry works correctly")
+                log("Cache expiry works correctly")
                 passedCount += 1
             } else {
-                log("  ❌ Cache expiry failed")
+                log("Cache expiry failed")
                 failedCount += 1
             }
         }
@@ -1217,13 +1217,13 @@ class ZTAPITests {
             _ = try await cacheProvider.request(request, uploadProgress: nil)
             let count2 = await baseProvider.getCount()
 
-            log("  Requests after clear: \(count2)")
+            log("Requests after clear: \(count2)")
 
             if count2 == 2 {
-                log("  ✅ Cache clear works correctly")
+                log("Cache clear works correctly")
                 passedCount += 1
             } else {
-                log("  ❌ Cache clear failed")
+                log("Cache clear failed")
                 failedCount += 1
             }
         }
@@ -1270,7 +1270,7 @@ class ZTAPITests {
             // Warm cache with successful request
             var _ = try await cacheProvider.request(request, uploadProgress: nil)
             let count = await baseProvider.getAttemptCount()
-            log("  Attempts after warm-up: \(count)")
+            log("Attempts after warm-up: \(count)")
 
             // Clear and reset
             await cacheProvider.clearCache()
@@ -1278,7 +1278,7 @@ class ZTAPITests {
             // First request fails, should still get cached data after warm-up
             // For this test, we need to setup cache first
             _ = try await cacheProvider.request(request, uploadProgress: nil)
-            log("  ✅ NetworkElseCache policy test completed")
+            log("NetworkElseCache policy test completed")
             passedCount += 1
         }
     }
@@ -1316,15 +1316,15 @@ class ZTAPITests {
             }
 
             let stats = await cacheProvider.cacheStats
-            log("  Cache size: \(stats.formattedSize)")
-            log("  Cache entries: \(stats.entryCount)")
+            log("Cache size: \(stats.formattedSize)")
+            log("Cache entries: \(stats.entryCount)")
 
             // Should have evicted at least one entry
             if stats.totalSize <= 2048 {
-                log("  ✅ Cache size limit respected")
+                log("Cache size limit respected")
                 passedCount += 1
             } else {
-                log("  ❌ Cache size limit exceeded")
+                log("Cache size limit exceeded")
                 failedCount += 1
             }
         }
@@ -1335,7 +1335,7 @@ class ZTAPITests {
     func runAllTests() async {
         log("\n")
         log("╔════════════════════════════════════════════════════════════╗")
-        log("║           ZTAPI Test Suite Started                            ║")
+        log("║           ZTAPI Test Suite Started                         ║")
         log("╚════════════════════════════════════════════════════════════╝")
 
         // Basic unit tests
@@ -1391,17 +1391,17 @@ class ZTAPITests {
         // Print summary
         log("\n")
         log("╔════════════════════════════════════════════════════════════╗")
-        log("║                    Test Summary                                 ║")
+        log("║                    Test Summary                            ║")
         log("╠════════════════════════════════════════════════════════════╣")
-        log("║  Passed: \(passedCount)                                         ║")
-        log("║  Failed: \(failedCount)                                         ║")
-        log("║  Total: \(passedCount + failedCount)                           ║")
+        log("║  Passed: \(passedCount)                                    ║")
+        log("║  Failed: \(failedCount)                                    ║")
+        log("║  Total: \(passedCount + failedCount)                       ║")
         log("╚════════════════════════════════════════════════════════════╝")
 
         if failedCount == 0 {
-            log("\n✅ All tests passed!")
+            log("\nAll tests passed!")
         } else {
-            log("\n❌ \(failedCount) test(s) failed")
+            log("\n\(failedCount) test(s) failed")
         }
     }
 }
