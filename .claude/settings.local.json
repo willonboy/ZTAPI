@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(cd:*)",
+      "Bash(for:*)",
+      "Bash(do xcodebuild:*)",
+      "Bash(done)",
+      "Bash(ruby <<'RUBY'\nrequire 'xcodeproj'\n\nproject_path = 'JsonDemo.xcodeproj'\nproject = Xcodeproj::Project.open\\(project_path\\)\n\n# 获取主 target\ntarget = project.targets.find { |t| t.name == 'JsonDemo' }\n\n# 添加测试文件\nfile_ref = project.main_group['JsonDemo'].new_file\\('ZTAPITests.swift'\\)\ntarget.add_file_references\\([file_ref]\\)\n\nproject.save\n\nputs \"已添加 ZTAPITests.swift 到项目\"\nRUBY)",
+      "Bash(1 echo 等待测试完成... sleep 10 xcrun simctl spawn iPhone 17 Pro log show --predicate 'process == \"\"\"\"JsonDemo\"\"\"\"' --last 30s --style=compact)",
+      "Bash(1 sleep 10 xcrun simctl spawn iPhone 17 Pro log show --predicate 'eventMessage CONTAINS \"\"\"\"ViewController\"\"\"\" OR eventMessage CONTAINS \"\"\"\"ZTAPI\"\"\"\"' --last 30s --style=compact --debug)",
+      "Bash(killall JsonDemo)",
+      "Bash(1 xcrun simctl terminate booted com.zt.JsonDemo)",
+      "Bash(log show:*)",
+      "Bash(killall:*)",
+      "Bash(1 sleep 8 echo '=== 尝试读取 app 日志 ===' xcrun simctl spawn booted log show --predicate 'subsystem == \"\"\"\"com.zt.JsonDemo\"\"\"\"' --last 1m)",
+      "Bash(timeout:*)",
+      "mcp__zread__search_doc",
+      "mcp__zread__read_file",
+      "Bash(open:*)"
+    ]
+  }
+}

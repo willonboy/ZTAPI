@@ -30,7 +30,6 @@ class ViewController: UIViewController {
         super.viewDidLoad()
 
         NSLog("[ViewController] viewDidLoad started")
-        print("[ViewController] viewDidLoad started")
 
         // Add test button
         let testButton = UIButton(type: .system)
@@ -51,7 +50,6 @@ class ViewController: UIViewController {
 
     @objc func runTests() {
         NSLog("[ViewController] runTests called")
-        print("[ViewController] runTests called")
         let tests = ZTAPITests()
         Task {
             NSLog("[ViewController] starting test suite")
@@ -60,5 +58,4 @@ class ViewController: UIViewController {
         }
     }
 }
-
 

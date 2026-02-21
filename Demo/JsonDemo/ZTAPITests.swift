@@ -89,7 +89,6 @@ class ZTAPITests {
 
     private func log(_ message: String) {
         let logMessage = "[ZTAPI-TEST]: \(message)"
-        print(logMessage)
         NSLog(logMessage)
         testResults.append(message)
     }
@@ -1240,11 +1239,11 @@ class ZTAPITests {
                     uploadProgress: ZTUploadProgressHandler?
                 ) async throws -> (Data, HTTPURLResponse) {
                     attemptCount += 1
-                    if attemptCount == 1 {
-                        // First attempt fails
+                    if attemptCount == 2 {
+                        // Second request fails (after cache is warmed)
                         throw NSError(domain: "Test", code: -1, userInfo: nil)
                     }
-                    // Second attempt succeeds
+                    // First request succeeds and warms cache
                     let data = "{\"id\":1,\"name\":\"Test\"}".data(using: .utf8)!
                     let response = HTTPURLResponse(
                         url: urlRequest.url!,
@@ -1268,18 +1267,23 @@ class ZTAPITests {
             let request = URLRequest(url: URL(string: "https://api.example.com/user/1")!)
 
             // Warm cache with successful request
-            var _ = try await cacheProvider.request(request, uploadProgress: nil)
-            let count = await baseProvider.getAttemptCount()
-            log("Attempts after warm-up: \(count)")
+            let firstData = try await cacheProvider.request(request, uploadProgress: nil).0
+            let countAfterWarmup = await baseProvider.getAttemptCount()
+            log("Attempts after warm-up: \(countAfterWarmup)")
 
-            // Clear and reset
-            await cacheProvider.clearCache()
+            // Second request: network fails, should fallback to cache
+            let secondData = try await cacheProvider.request(request, uploadProgress: nil).0
+            let finalCount = await baseProvider.getAttemptCount()
+            log("Final network attempt count: \(finalCount)")
 
-            // First request fails, should still get cached data after warm-up
-            // For this test, we need to setup cache first
-            _ = try await cacheProvider.request(request, uploadProgress: nil)
-            log("NetworkElseCache policy test completed")
-            passedCount += 1
+            assertEqual(firstData, secondData)
+            if finalCount == 2 {
+                log("NetworkElseCache policy works: fallback to cache on network error")
+                passedCount += 1
+            } else {
+                log("NetworkElseCache policy failed")
+                failedCount += 1
+            }
         }
     }
 

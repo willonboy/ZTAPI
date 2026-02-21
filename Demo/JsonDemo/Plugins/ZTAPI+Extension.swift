@@ -38,7 +38,17 @@ public extension ZTAPI {
                 let promiseTransfer = PromiseTransfer(value: promise)
                 Task {
                     do {
-                        let result: T = try await self.response()
+                        let result: T
+                        // Data should use raw response path instead of JSONDecoder(Data.self,...)
+                        if T.self == Data.self {
+                            let raw = try await self.send()
+                            guard let typed = raw as? T else {
+                                throw ZTAPIError.invalidResponseFormat
+                            }
+                            result = typed
+                        } else {
+                            result = try await self.response()
+                        }
                         await MainActor.run {
                             promiseTransfer.value(.success(result))
                         }
