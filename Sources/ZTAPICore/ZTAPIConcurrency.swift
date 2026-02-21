@@ -28,31 +28,53 @@ import Foundation
 /// Used to limit the number of concurrent network requests
 private actor ZTConcurrencySemaphore {
     private var currentCount = 0
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waiters: [UUID: CheckedContinuation<Void, Error>] = [:]
+    private var waiterOrder: [UUID] = []
     let maxCount: Int
 
     init(maxCount: Int) {
-        self.maxCount = maxCount
+        self.maxCount = max(1, maxCount)
     }
 
-    func acquire() async {
+    func acquire() async throws {
         if currentCount < maxCount {
             currentCount += 1
             return
         }
 
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
+        let waiterID = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                waiters[waiterID] = continuation
+                waiterOrder.append(waiterID)
+            }
+        } onCancel: {
+            Task {
+                await self.cancelWaiter(waiterID)
+            }
         }
+
         // When woken up, already "inherited" a released slot
         currentCount += 1
     }
 
+    private func cancelWaiter(_ waiterID: UUID) {
+        guard let continuation = waiters.removeValue(forKey: waiterID) else {
+            return
+        }
+        waiterOrder.removeAll { $0 == waiterID }
+        continuation.resume(throwing: CancellationError())
+    }
+
     func release() {
-        if let waiter = waiters.first {
-            waiters.removeFirst()
-            waiter.resume()
-        } else {
+        if let nextWaiterID = waiterOrder.first,
+           let continuation = waiters.removeValue(forKey: nextWaiterID) {
+            waiterOrder.removeFirst()
+            continuation.resume(returning: ())
+            return
+        }
+
+        if currentCount > 0 {
             currentCount -= 1
         }
     }
@@ -83,16 +105,17 @@ public final class ZTConcurrencyProvider: ZTAPIProvider {
     }
 
     public func request(_ urlRequest: URLRequest, uploadProgress: ZTUploadProgressHandler?) async throws -> (Data, HTTPURLResponse) {
-        await semaphore.acquire()
-        defer {
-            Task {
-                await semaphore.release()
-            }
+        try await semaphore.acquire()
+        do {
+            let result = try await baseProvider.request(
+                urlRequest,
+                uploadProgress: uploadProgress
+            )
+            await semaphore.release()
+            return result
+        } catch {
+            await semaphore.release()
+            throw error
         }
-
-        return try await baseProvider.request(
-            urlRequest,
-            uploadProgress: uploadProgress
-        )
     }
 }

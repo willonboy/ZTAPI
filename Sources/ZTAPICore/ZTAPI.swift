@@ -23,6 +23,14 @@
 import Foundation
 @preconcurrency import Combine
 
+private extension NSLock {
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock()
+        defer { unlock() }
+        return try body()
+    }
+}
+
 /// API parameter protocol
 public protocol ZTAPIParamProtocol: Sendable {
     var key: String { get }
@@ -61,30 +69,70 @@ public enum ZTAPIKVParam: ZTAPIParamProtocol {
 /// ZTAPI network request class
 /// Uses Codable protocol for response parsing, no third-party JSON library dependency
 public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
-    public private(set) var urlStr: String
-    public private(set) var method: ZTHTTPMethod
-    public private(set) var params: [String: Sendable] = [:]
-    public private(set) var headers: [String: String] = [:]
-    public private(set) var bodyData: Data? = nil
-    public private(set) var encoding: any ZTParameterEncoding = ZTURLEncoding()
+    private let stateLock = NSLock()
+    private var _urlStr: String
+    private var _method: ZTHTTPMethod
+    private var _params: [String: Sendable] = [:]
+    private var _headers: [String: String] = [:]
+    private var _bodyData: Data? = nil
+    private var _encoding: any ZTParameterEncoding = ZTURLEncoding()
 
     private let provider: any ZTAPIProvider
-    private var plugins: [any ZTAPIPlugin] = []
-    private var requestTimeout: TimeInterval?
-    private var requestRetryPolicy: (any ZTAPIRetryPolicy)?
-    private var uploadProgressHandler: ZTUploadProgressHandler?
+    private var _plugins: [any ZTAPIPlugin] = []
+    private var _requestTimeout: TimeInterval?
+    private var _requestRetryPolicy: (any ZTAPIRetryPolicy)?
+    private var _uploadProgressHandler: ZTUploadProgressHandler?
+
+    public var urlStr: String {
+        stateLock.withLock { _urlStr }
+    }
+
+    public var method: ZTHTTPMethod {
+        stateLock.withLock { _method }
+    }
+
+    public var params: [String: Sendable] {
+        stateLock.withLock { _params }
+    }
+
+    public var headers: [String: String] {
+        stateLock.withLock { _headers }
+    }
+
+    public var bodyData: Data? {
+        stateLock.withLock { _bodyData }
+    }
+
+    public var encoding: any ZTParameterEncoding {
+        stateLock.withLock { _encoding }
+    }
+
+    private struct StateSnapshot {
+        let urlStr: String
+        let method: ZTHTTPMethod
+        let params: [String: Sendable]
+        let headers: [String: String]
+        let bodyData: Data?
+        let encoding: any ZTParameterEncoding
+        let plugins: [any ZTAPIPlugin]
+        let requestTimeout: TimeInterval?
+        let requestRetryPolicy: (any ZTAPIRetryPolicy)?
+        let uploadProgressHandler: ZTUploadProgressHandler?
+    }
 
     public init(_ url: String, _ method: ZTHTTPMethod = .get, provider: any ZTAPIProvider) {
-        self.urlStr = url
-        self.method = method
+        self._urlStr = url
+        self._method = method
         self.provider = provider
     }
 
     /// Add request parameters
     @discardableResult
     public func params(_ ps: P...) -> Self {
-        ps.forEach { p in
-            params[p.key] = p.value
+        stateLock.withLock {
+            ps.forEach { p in
+                _params[p.key] = p.value
+            }
         }
         return self
     }
@@ -92,15 +140,19 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     /// Add request parameters (dictionary form)
     @discardableResult
     public func params(_ ps: [String: Sendable]) -> Self {
-        params.merge(ps) { k, k2 in k2 }
+        stateLock.withLock {
+            _params.merge(ps) { _, new in new }
+        }
         return self
     }
 
     /// Add HTTP headers
     @discardableResult
     public func headers(_ hds: ZTAPIHeader...) -> Self {
-        for header in hds {
-            headers[header.key] = header.value
+        stateLock.withLock {
+            for header in hds {
+                _headers[header.key] = header.value
+            }
         }
         return self
     }
@@ -108,14 +160,18 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     /// Set parameter encoding
     @discardableResult
     public func encoding(_ e: any ZTParameterEncoding) -> Self {
-        encoding = e
+        stateLock.withLock {
+            _encoding = e
+        }
         return self
     }
 
     /// Set raw request body
     @discardableResult
     public func body(_ data: Data) -> Self {
-        bodyData = data
+        stateLock.withLock {
+            _bodyData = data
+        }
         return self
     }
 
@@ -146,8 +202,10 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     /// Upload using Multipart data (supports multiple files + other form fields)
     @discardableResult
     public func multipart(_ formData: ZTMultipartFormData) -> Self {
-        bodyData = nil
-        encoding = ZTMultipartEncoding(formData)
+        stateLock.withLock {
+            _bodyData = nil
+            _encoding = ZTMultipartEncoding(formData)
+        }
         return self
     }
 
@@ -156,28 +214,36 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     /// Set request timeout (seconds)
     @discardableResult
     public func timeout(_ interval: TimeInterval) -> Self {
-        requestTimeout = interval
+        stateLock.withLock {
+            _requestTimeout = interval
+        }
         return self
     }
 
     /// Set retry policy
     @discardableResult
     public func retry(_ policy: (any ZTAPIRetryPolicy)?) -> Self {
-        requestRetryPolicy = policy
+        stateLock.withLock {
+            _requestRetryPolicy = policy
+        }
         return self
     }
 
     /// Set upload progress callback
     @discardableResult
     public func uploadProgress(_ handler: @escaping ZTUploadProgressHandler) -> Self {
-        uploadProgressHandler = handler
+        stateLock.withLock {
+            _uploadProgressHandler = handler
+        }
         return self
     }
 
     /// Add plugins
     @discardableResult
     public func plugins(_ ps: (any ZTAPIPlugin)...) -> Self {
-        plugins.append(contentsOf: ps)
+        stateLock.withLock {
+            _plugins.append(contentsOf: ps)
+        }
         return self
     }
 
@@ -186,37 +252,52 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     /// Send request and return raw Data
     @discardableResult
     public func send() async throws -> Data {
-        if P.isValid(params) == false {
+        let snapshot = stateLock.withLock {
+            StateSnapshot(
+                urlStr: _urlStr,
+                method: _method,
+                params: _params,
+                headers: _headers,
+                bodyData: _bodyData,
+                encoding: _encoding,
+                plugins: _plugins,
+                requestTimeout: _requestTimeout,
+                requestRetryPolicy: _requestRetryPolicy,
+                uploadProgressHandler: _uploadProgressHandler
+            )
+        }
+
+        if P.isValid(snapshot.params) == false {
             throw ZTAPIError.invalidParams
         }
 
-        guard let url = URL(string: urlStr) else {
-            throw ZTAPIError.invalidURL(urlStr)
+        guard let url = URL(string: snapshot.urlStr) else {
+            throw ZTAPIError.invalidURL(snapshot.urlStr)
         }
 
         var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = method.rawValue
+        urlRequest.httpMethod = snapshot.method.rawValue
 
-        for (key, value) in headers {
+        for (key, value) in snapshot.headers {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
         // bodyData takes priority over encoding
-        if let body = bodyData {
+        if let body = snapshot.bodyData {
             urlRequest.httpBody = body
         } else {
-            try encoding.encode(&urlRequest, with: params)
+            try snapshot.encoding.encode(&urlRequest, with: snapshot.params)
         }
 
         // Set timeout (default 60 seconds)
-        urlRequest.timeoutInterval = requestTimeout ?? 60
+        urlRequest.timeoutInterval = snapshot.requestTimeout ?? 60
 
         // Execute willSend plugins
-        for plugin in plugins {
+        for plugin in snapshot.plugins {
             try await plugin.willSend(&urlRequest)
         }
 
-        let effectiveProvider = if let policy = requestRetryPolicy {
+        let effectiveProvider = if let policy = snapshot.requestRetryPolicy {
             ZTRetryProvider(baseProvider: provider, retryPolicy: policy)
         } else {
             provider
@@ -227,19 +308,19 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         do {
             let (data, response) = try await effectiveProvider.request(
                 urlRequest,
-                uploadProgress: uploadProgressHandler
+                uploadProgress: snapshot.uploadProgressHandler
             )
             httpResponse = response
             responseData = data
 
             // Execute didReceive plugins
-            for plugin in plugins {
+            for plugin in snapshot.plugins {
                 try await plugin.didReceive(response, data: data, request: urlRequest)
             }
 
             // Execute process plugins
             var processedData = data
-            for plugin in plugins {
+            for plugin in snapshot.plugins {
                 processedData = try await plugin.process(processedData, response: response, request: urlRequest)
             }
 
@@ -250,7 +331,7 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             if httpResponse == nil {
                 httpResponse = (error as? ZTAPIError)?.httpResponse
             }
-            for plugin in plugins {
+            for plugin in snapshot.plugins {
                 try await plugin.didCatch(error, request: urlRequest, response: httpResponse, data: responseData)
             }
             throw error
@@ -266,7 +347,7 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
 
 #if DEBUG
     deinit {
-        print("dealloc", urlStr)
+        print("dealloc", _urlStr)
     }
 #endif
 }

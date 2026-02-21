@@ -7,7 +7,7 @@ ZTAPI
                        DESC
 
   s.homepage         = 'https://github.com/willonboy/ZTAPI.git'
-  s.license          = { :type => 'MIT', :file => 'LICENSE' }
+  s.license          = { :type => 'AGPL-3.0', :file => 'LICENSE' }
   s.author           = { 'zt' => '' }
   s.source           = { :git => 'https://github.com/willonboy/ZTAPI.git', :tag => s.version.to_s }
 

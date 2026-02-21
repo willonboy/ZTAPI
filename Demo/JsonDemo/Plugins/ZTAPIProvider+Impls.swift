@@ -23,10 +23,20 @@
 import Foundation
 import ZTAPICore
 
+private extension NSLock {
+    @inline(__always)
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock()
+        defer { unlock() }
+        return try body()
+    }
+}
+
 // MARK: - URLSession Provider
 
-private actor UploadTaskState {
+private final class UploadTaskState {
     private let continuation: CheckedContinuation<(Data, URLResponse), Error>
+    private let lock = NSLock()
 
     private var responseData = Data()
     private var response: URLResponse?
@@ -37,44 +47,58 @@ private actor UploadTaskState {
     }
 
     func append(_ data: Data) {
-        guard !finished else { return }
-        responseData.append(data)
+        lock.withLock {
+            guard !finished else { return }
+            responseData.append(data)
+        }
     }
 
     func setResponse(_ response: URLResponse) {
-        self.response = response
+        lock.withLock {
+            guard !finished else { return }
+            self.response = response
+        }
     }
 
     func finish(error: Error?) {
-        guard !finished else { return }
-        finished = true
+        enum Completion {
+            case failure(Error)
+            case success(Data, URLResponse)
+        }
 
-        if let error {
-            // If response exists, attach it to the error for retry policy
-            let httpResponse = response.flatMap { $0 as? HTTPURLResponse }
-            if let httpResponse {
-                let wrappedError = ZTAPIError(
-                    (error as NSError).code,
-                    error.localizedDescription,
-                    httpResponse: httpResponse
-                )
-                continuation.resume(throwing: wrappedError)
-            } else {
-                continuation.resume(throwing: error)
+        let completion: Completion? = lock.withLock {
+            guard !finished else { return nil }
+            finished = true
+
+            if let error {
+                // If response exists, attach it to the error for retry policy
+                let httpResponse = response.flatMap { $0 as? HTTPURLResponse }
+                if let httpResponse {
+                    let wrappedError = ZTAPIError(
+                        (error as NSError).code,
+                        error.localizedDescription,
+                        httpResponse: httpResponse
+                    )
+                    return .failure(wrappedError)
+                }
+                return .failure(error)
             }
-            return
+
+            guard let response else {
+                return .failure(ZTAPIError.emptyResponse)
+            }
+
+            return .success(responseData, response)
         }
 
-        guard let response else {
-            continuation.resume(
-                throwing: ZTAPIError.emptyResponse
-            )
-            return
-        }
+        guard let completion else { return }
 
-        continuation.resume(
-            returning: (responseData, response)
-        )
+        switch completion {
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        case .success(let data, let response):
+            continuation.resume(returning: (data, response))
+        }
     }
 }
 
@@ -111,9 +135,7 @@ private final class UploadDelegate: NSObject, URLSessionTaskDelegate, URLSession
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
         didReceive data: Data) {
-        Task {
-            await state.append(data)
-        }
+        state.append(data)
     }
 
     func urlSession(
@@ -122,17 +144,13 @@ private final class UploadDelegate: NSObject, URLSessionTaskDelegate, URLSession
         didReceive response: URLResponse,
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
-        Task {
-            await state.setResponse(response)
-        }
+        state.setResponse(response)
         completionHandler(.allow)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
         didCompleteWithError error: Error?) {
-        Task {
-            await state.finish(error: error)
-        }
+        state.finish(error: error)
     }
 }
 

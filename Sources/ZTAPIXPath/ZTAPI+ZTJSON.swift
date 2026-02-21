@@ -58,6 +58,20 @@ public extension ZTAPIError {
     static func xpathParseFailed(_ xpath: String) -> ZTAPIError {
         ZTAPIError(80020001, "XPath parsing failed: path '\(xpath)' not found")
     }
+
+    /// XPath type conversion failed
+    static func xpathTypeMismatch(_ xpath: String, expectedType: Any.Type, underlying: Error? = nil) -> ZTAPIError {
+        if let underlying {
+            return ZTAPIError(
+                80020002,
+                "XPath parsing failed at '\(xpath)': expected \(expectedType), underlying: \(underlying)"
+            )
+        }
+        return ZTAPIError(
+            80020002,
+            "XPath parsing failed at '\(xpath)': expected \(expectedType)"
+        )
+    }
 }
 
 // MARK: - ZTAPI ZTJSON Extension
@@ -79,7 +93,13 @@ extension ZTAPI {
                     let parsed = try config.type.init(from: js)
                     res[config.xpath] = parsed
                 } catch {
-                    // Parse failed, silently ignore (optional config)
+                    if !config.isAllowMissing {
+                        throw ZTAPIError.xpathTypeMismatch(
+                            config.xpath,
+                            expectedType: config.type,
+                            underlying: error
+                        )
+                    }
                 }
             } else if !config.isAllowMissing {
                 throw ZTAPIError.xpathParseFailed(config.xpath)

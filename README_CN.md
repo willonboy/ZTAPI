@@ -8,7 +8,7 @@ ZTAPI 采用 **Fluent Interface / Builder 模式**，所有配置方法返回 `S
 import ZTAPI
 
 // 完整的链式 DSL 示例
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get, provider: ZTURLSessionProvider.shared)
     .params(.kv("id", 123), .kv("include", "profile"))
     .headers(.h(key: "Authorization", value: "Bearer xxx"))
     .timeout(30)
@@ -128,17 +128,19 @@ pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 
 ## 快速入门
 
+> 注意：`ZTAPI` 的每个请求都需要明确传入 `provider:`。下方示例使用的是 Demo 工程中的 `ZTURLSessionProvider.shared`。
+
 最简单的 GET 请求：
 
 ```swift
 import ZTAPI
 
 // 直接获取数据
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123")
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared)
     .response()
 
 // 带参数
-let users: [User] = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users")
+let users: [User] = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", provider: ZTURLSessionProvider.shared)
     .params(.kv("page", 1), .kv("size", 20))
     .response()
 ```
@@ -147,12 +149,12 @@ POST 请求：
 
 ```swift
 // URL 表单编码（默认）
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("username", "jack"), .kv("password", "123456"))
     .response()
 
 // JSON 请求体
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("username", "jack"), .kv("password", "123456"))
     .encoding(ZTJSONEncoding())
     .response()
@@ -181,26 +183,26 @@ struct LoginResponse: Codable {
 
 ```swift
 // GET
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared).response()
 
 // POST
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("name", "Jack"), .kv("email", "jack@example.com"))
     .response()
 
 // PUT
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .put)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .put, provider: ZTURLSessionProvider.shared)
     .params(.kv("name", "Jack Updated"))
     .response()
 
 // DELETE
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .delete).response()
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .delete, provider: ZTURLSessionProvider.shared).response()
 ```
 
 ### 请求头与超时
 
 ```swift
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .headers(.h(key: "Authorization", value: "Bearer token123"), .h(key: "Accept", value: "application/json"))
     .timeout(30)
     .response()
@@ -210,7 +212,7 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
 
 ```swift
 // 获取原始 Data
-let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data").send()
+let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared).send()
 
 // 获取原始 String
 let text = String(decoding: data, as: UTF8.self)
@@ -222,7 +224,7 @@ let text = String(decoding: data, as: UTF8.self)
 
 ```swift
 // 获取 [String: Any] 字典
-let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .responseDict()
 
 // 访问字段
@@ -234,7 +236,7 @@ dict["age"] as? Int
 
 ```swift
 do {
-    let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+    let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared).response()
 } catch let error as ZTAPIError {
     print("错误 \(error.code): \(error.msg)")
     // 根据错误码处理
@@ -419,7 +421,7 @@ struct User {
 // JSON: { "id": 1, "name": "Jack", "address": { "city": "Beijing", "geo": { "lat": 39.9, "lng": 116.4 } } }
 // 无需定义 Address、Geo 嵌套模型！
 
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1").response()
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1", provider: ZTURLSessionProvider.shared).response()
 #endif
 ```
 
@@ -431,7 +433,7 @@ let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1")
 
 ```swift
 #if canImport(ZTJSON)
-let results = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let results = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .parseResponse(
         // isAllowMissing: true（默认）- 字段不存在时不报错，返回 nil
         ZTAPIParseConfig("/data/user/name", type: String.self),
@@ -457,7 +459,7 @@ if let posts = results["/data/posts"] as? [Post] {
 ```swift
 // 上传单个 Data
 let imageData = try Data(contentsOf: imageURL)
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg))
     .uploadProgress { progress in
         print("进度: \(progress.fractionCompleted * 100)%")
@@ -465,12 +467,12 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .po
     .response()
 
 // 上传单个文件
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.file(fileURL, name: "file", mimeType: .txt))
     .response()
 
 // 多文件混合上传（Data + File）
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multiple", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multiple", .post, provider: ZTURLSessionProvider.shared)
     .upload(
         .data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg),
         .file(fileURL, name: "document", mimeType: .pdf)
@@ -484,18 +486,18 @@ let formData = ZTMultipartFormData()
     .add(.data(Data("file2".utf8), name: "files", fileName: "file2.txt", mimeType: .txt))
     .add(.data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
 
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multipart", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multipart", .post, provider: ZTURLSessionProvider.shared)
     .multipart(formData)
     .response()
 
 // 原始 body 上传
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/raw", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/raw", .post, provider: ZTURLSessionProvider.shared)
     .body(Data("raw body data".utf8))
     .headers(.h("Content-Type", ZTMimeType.octetStream.rawValue))
     .response()
 
 // 自定义 MIME 类型
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.data(Data("custom data".utf8), name: "file", mimeType: .custom(ext: "", mime: "application/vnd.example")))
     .response()
 ```
@@ -617,7 +619,7 @@ protocol ZTAPIPlugin: Sendable {
 
 ```swift
 // 使用插件
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .plugins(ZTLogPlugin(), ZTAuthPlugin { "my-token" })
     .response()
 ```
@@ -648,17 +650,17 @@ struct RequestSignPlugin: ZTAPIPlugin {
 
 ```swift
 // 固定延迟重试
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable", provider: ZTURLSessionProvider.shared)
     .retry(ZTFixedRetryPolicy(maxAttempts: 3, delay: 1.0))
     .response()
 
 // 指数退避
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable", provider: ZTURLSessionProvider.shared)
     .retry(ZTExponentialBackoffRetryPolicy(maxAttempts: 5, baseDelay: 1.0, multiplier: 2.0))
     .response()
 
 // 自定义条件重试（async 闭包）
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom", provider: ZTURLSessionProvider.shared)
     .retry(ZTConditionalRetryPolicy(maxAttempts: 3, delay: 2.0) {
         request, error, attempt, response in
         // 只在 5xx 错误时重试
@@ -689,7 +691,7 @@ let provider = ZTSSLPinningProvider(mode: .disabled)
 
 **Alamofire SSL Pinning：**
 
-> 注：Alamofire Provider 仅支持证书固定，如需公钥固定请使用 `ZTSSLPinningProvider`。
+> 注：`ZTAlamofireProvider.pinning(mode:)` 同时支持证书固定和公钥哈希固定，默认支持 host 通配（`*`）匹配。
 
 ```swift
 import Alamofire
@@ -700,6 +702,10 @@ let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
 // 或直接使用 pinning(mode:) 方法
 let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
 let provider = ZTAlamofireProvider.pinning(mode: .certificate(certificates))
+
+// 公钥哈希固定
+let keyHashes = ZTCertificateLoader.publicKeyHashes(from: certificates)
+let provider = ZTAlamofireProvider.pinning(mode: .publicKey(keyHashes))
 
 // 禁用验证（仅开发环境，仅 DEBUG 模式可用）
 let provider = ZTAlamofireProvider.insecureProvider()
@@ -734,7 +740,7 @@ import Combine
 enum UserCenterAPI {
     // 返回 ZTAPI 实例用于链式调用
     static func userInfo(userId: String) -> ZTAPI<ZTAPIKVParam> {
-        ZTAPI<ZTAPIKVParam>("https://api.example.com/user/info")
+        ZTAPI<ZTAPIKVParam>("https://api.example.com/user/info", provider: ZTURLSessionProvider.shared)
             .params(.kv("userId", userId))
     }
 }

@@ -81,6 +81,11 @@ public extension ZTAPIError {
     /// Upload requires httpBody
     static var uploadRequiresBody: ZTAPIError { ZTAPIError(80000005, "Upload requires httpBody") }
 
+    /// Retry policy returned invalid delay
+    static func invalidRetryDelay(_ delay: TimeInterval) -> ZTAPIError {
+        ZTAPIError(80000007, "Retry policy returned invalid delay: \(delay)")
+    }
+
     /// JSON related errors 80010000-80010999
 
     /// Parameters contain non-JSON-serializable objects

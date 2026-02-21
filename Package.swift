@@ -58,5 +58,15 @@ let package = Package(
             dependencies: ["ZTAPICore", "ZTAPIParamMacros"],
             path: "Sources/ZTAPIParamMacro"
         ),
+        .testTarget(
+            name: "ZTAPICoreTests",
+            dependencies: ["ZTAPICore"],
+            path: "Tests/ZTAPICoreTests"
+        ),
+        .testTarget(
+            name: "ZTAPIXPathTests",
+            dependencies: ["ZTAPIXPath"],
+            path: "Tests/ZTAPIXPathTests"
+        ),
     ]
 )

@@ -8,7 +8,7 @@ ZTAPI adopts **Fluent Interface / Builder pattern**, where all configuration met
 import ZTAPI
 
 // Complete chain DSL example
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get)
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .get, provider: ZTURLSessionProvider.shared)
     .params(.kv("id", 123), .kv("include", "profile"))
     .headers(.h(key: "Authorization", value: "Bearer xxx"))
     .timeout(30)
@@ -128,17 +128,19 @@ pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 
 ## Quick Start
 
+> Note: `ZTAPI` requires a concrete `provider:` for each request. The examples below use `ZTURLSessionProvider.shared` from the Demo project provider implementations.
+
 The simplest GET request:
 
 ```swift
 import ZTAPI
 
 // Get data directly
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123")
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared)
     .response()
 
 // With parameters
-let users: [User] = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users")
+let users: [User] = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", provider: ZTURLSessionProvider.shared)
     .params(.kv("page", 1), .kv("size", 20))
     .response()
 ```
@@ -147,12 +149,12 @@ POST request:
 
 ```swift
 // URL-encoded form (default)
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("username", "jack"), .kv("password", "123456"))
     .response()
 
 // JSON body
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/login", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("username", "jack"), .kv("password", "123456"))
     .encoding(ZTJSONEncoding())
     .response()
@@ -181,26 +183,26 @@ struct LoginResponse: Codable {
 
 ```swift
 // GET
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared).response()
 
 // POST
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/users", .post, provider: ZTURLSessionProvider.shared)
     .params(.kv("name", "Jack"), .kv("email", "jack@example.com"))
     .response()
 
 // PUT
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .put)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .put, provider: ZTURLSessionProvider.shared)
     .params(.kv("name", "Jack Updated"))
     .response()
 
 // DELETE
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .delete).response()
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", .delete, provider: ZTURLSessionProvider.shared).response()
 ```
 
 ### Headers & Timeout
 
 ```swift
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .headers(.h(key: "Authorization", value: "Bearer token123"), .h(key: "Accept", value: "application/json"))
     .timeout(30)
     .response()
@@ -210,7 +212,7 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
 
 ```swift
 // Get raw Data
-let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data").send()
+let data = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared).send()
 
 // Get raw String
 let text = String(decoding: data, as: UTF8.self)
@@ -222,7 +224,7 @@ Get response as dictionary without defining models:
 
 ```swift
 // Get as [String: Any] dictionary
-let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let dict = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .responseDict()
 
 // Access fields
@@ -234,7 +236,7 @@ dict["age"] as? Int
 
 ```swift
 do {
-    let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123").response()
+    let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/123", provider: ZTURLSessionProvider.shared).response()
 } catch let error as ZTAPIError {
     print("Error \(error.code): \(error.msg)")
     // Handle error by code
@@ -419,7 +421,7 @@ struct User {
 // JSON: { "id": 1, "name": "Jack", "address": { "city": "Beijing", "geo": { "lat": 39.9, "lng": 116.4 } } }
 // No need to define Address, Geo nested models!
 
-let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1").response()
+let user: User = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/user/1", provider: ZTURLSessionProvider.shared).response()
 #endif
 ```
 
@@ -431,7 +433,7 @@ Parse multiple XPath paths at runtime without defining models:
 
 ```swift
 #if canImport(ZTJSON)
-let results = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let results = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .parseResponse(
         // isAllowMissing: true (default) - doesn't error when field missing, returns nil
         ZTAPIParseConfig("/data/user/name", type: String.self),
@@ -457,7 +459,7 @@ if let posts = results["/data/posts"] as? [Post] {
 ```swift
 // Upload single Data
 let imageData = try Data(contentsOf: imageURL)
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.data(imageData, name: "avatar", fileName: "photo.jpg", mimeType: .jpeg))
     .uploadProgress { progress in
         print("Progress: \(progress.fractionCompleted * 100)%")
@@ -465,12 +467,12 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .po
     .response()
 
 // Upload single file
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.file(fileURL, name: "file", mimeType: .txt))
     .response()
 
 // Multi-file mixed upload (Data + File)
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multiple", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multiple", .post, provider: ZTURLSessionProvider.shared)
     .upload(
         .data(imageData, name: "avatar", fileName: "avatar.jpg", mimeType: .jpeg),
         .file(fileURL, name: "document", mimeType: .pdf)
@@ -484,18 +486,18 @@ let formData = ZTMultipartFormData()
     .add(.data(Data("file2".utf8), name: "files", fileName: "file2.txt", mimeType: .txt))
     .add(.data(Data("{\"userId\":\"123\"}".utf8), name: "metadata", mimeType: .json))
 
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multipart", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/multipart", .post, provider: ZTURLSessionProvider.shared)
     .multipart(formData)
     .response()
 
 // Raw body upload
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/raw", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload/raw", .post, provider: ZTURLSessionProvider.shared)
     .body(Data("raw body data".utf8))
     .headers(.h("Content-Type", ZTMimeType.octetStream.rawValue))
     .response()
 
 // Custom MIME type
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post)
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .post, provider: ZTURLSessionProvider.shared)
     .upload(.data(Data("custom data".utf8), name: "file", mimeType: .custom(ext: "", mime: "application/vnd.example")))
     .response()
 ```
@@ -617,7 +619,7 @@ protocol ZTAPIPlugin: Sendable {
 
 ```swift
 // Use plugins
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/data", provider: ZTURLSessionProvider.shared)
     .plugins(ZTLogPlugin(), ZTAuthPlugin { "my-token" })
     .response()
 ```
@@ -648,17 +650,17 @@ struct RequestSignPlugin: ZTAPIPlugin {
 
 ```swift
 // Fixed delay retry
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable", provider: ZTURLSessionProvider.shared)
     .retry(ZTFixedRetryPolicy(maxAttempts: 3, delay: 1.0))
     .response()
 
 // Exponential backoff
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/unstable", provider: ZTURLSessionProvider.shared)
     .retry(ZTExponentialBackoffRetryPolicy(maxAttempts: 5, baseDelay: 1.0, multiplier: 2.0))
     .response()
 
 // Custom condition retry (async closure)
-let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom")
+let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/custom", provider: ZTURLSessionProvider.shared)
     .retry(ZTConditionalRetryPolicy(maxAttempts: 3, delay: 2.0) {
         request, error, attempt, response in
         // Only retry on 5xx errors
@@ -689,7 +691,7 @@ let provider = ZTSSLPinningProvider(mode: .disabled)
 
 **Alamofire SSL Pinning:**
 
-> Note: Alamofire provider only supports certificate pinning. For public key pinning, use `ZTSSLPinningProvider`.
+> Note: `ZTAlamofireProvider.pinning(mode:)` supports both certificate pinning and public-key-hash pinning. Host wildcard (`*`) mapping is supported by default.
 
 ```swift
 import Alamofire
@@ -700,6 +702,10 @@ let provider = ZTAlamofireProvider.certificatePinning(from: "myserver")
 // Or using pinning(mode:) directly
 let certificates = ZTCertificateLoader.loadCertificates(named: "myserver")
 let provider = ZTAlamofireProvider.pinning(mode: .certificate(certificates))
+
+// Public Key Hash pinning
+let keyHashes = ZTCertificateLoader.publicKeyHashes(from: certificates)
+let provider = ZTAlamofireProvider.pinning(mode: .publicKey(keyHashes))
 
 // Disable validation (development only, DEBUG only)
 let provider = ZTAlamofireProvider.insecureProvider()
@@ -734,7 +740,7 @@ import Combine
 enum UserCenterAPI {
     // Return ZTAPI instance for chain calls
     static func userInfo(userId: String) -> ZTAPI<ZTAPIKVParam> {
-        ZTAPI<ZTAPIKVParam>("https://api.example.com/user/info")
+        ZTAPI<ZTAPIKVParam>("https://api.example.com/user/info", provider: ZTURLSessionProvider.shared)
             .params(.kv("userId", userId))
     }
 }

@@ -88,14 +88,21 @@ final class ZTRetryProvider: @unchecked Sendable, ZTAPIProvider {
                 }
 
                 let delay = await retryPolicy.delay(for: attempt)
+                guard delay.isFinite else {
+                    throw ZTAPIError.invalidRetryDelay(delay)
+                }
+                let clampedDelay = max(0, delay)
+                let sleepNanoseconds = UInt64(
+                    min(clampedDelay * 1_000_000_000, Double(UInt64.max))
+                )
 
     #if DEBUG
-                print("[ZTAPI] Retry attempt \(attempt) after \(delay)s")
+                print("[ZTAPI] Retry attempt \(attempt) after \(clampedDelay)s")
     #endif
 
-                try await Task.sleep(
-                    nanoseconds: UInt64(delay * 1_000_000_000)
-                )
+                if sleepNanoseconds > 0 {
+                    try await Task.sleep(nanoseconds: sleepNanoseconds)
+                }
             }
         }
 

@@ -234,6 +234,14 @@ public actor ZTAPICacheProvider: ZTAPIProvider {
         data: Data,
         response: HTTPURLResponse
     ) {
+        if maxCacheSize > 0 && data.count > maxCacheSize {
+            // Entry is larger than total cache capacity, keep cache bounded.
+            if let old = storage.removeValue(forKey: key) {
+                currentCacheSize -= old.data.count
+            }
+            return
+        }
+
         evictIfNeeded(adding: data.count)
 
         let entry = CacheEntry(
@@ -334,10 +342,10 @@ public struct CacheStats: Sendable {
 
 extension ZTAPIError {
     static var cacheNotFound: ZTAPIError {
-        ZTAPIError(80030001, "Cache not found")
+        ZTAPIError(80031001, "Cache not found")
     }
 
     static var cacheExpired: ZTAPIError {
-        ZTAPIError(80030002, "Cache expired")
+        ZTAPIError(80031002, "Cache expired")
     }
 }
