@@ -24,6 +24,33 @@ import Foundation
 import ZTAPICore
 import Combine
 
+public extension ZTAPI {
+    /// Send request and return decoded Codable object
+    @discardableResult
+    func response<T: Decodable>() async throws -> T {
+        let data = try await send()
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Send request and return response as [String: Any] dictionary
+    func responseDict() async throws -> [String: Any] {
+        let data = try await send()
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ZTAPIError.invalidResponseFormat
+        }
+        return json
+    }
+
+    /// Send request and return response as [[String: Any]] array
+    func responseArr() async throws -> [[String: Any]] {
+        let data = try await send()
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ZTAPIError.invalidResponseFormat
+        }
+        return json
+    }
+}
+
 @MainActor
 public extension ZTAPI {
     /// Wrapper for safely passing Future.Promise across concurrency domains
@@ -62,26 +89,5 @@ public extension ZTAPI {
         }
         .share()
         .eraseToAnyPublisher()
-    }
-}
-
-@MainActor
-public extension ZTAPI {
-    /// Send request and return response as [String: Any] dictionary
-    func responseDict() async throws -> [String: Any] {
-        let data = try await send()
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ZTAPIError.invalidResponseFormat
-        }
-        return json
-    }
-
-    /// Send request and return response as [[String: Any]] array
-    func responseArr() async throws -> [[String: Any]] {
-        let data = try await send()
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw ZTAPIError.invalidResponseFormat
-        }
-        return json
     }
 }

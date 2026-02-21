@@ -129,6 +129,8 @@ pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 ## Quick Start
 
 > Note: `ZTAPI` requires a concrete `provider:` for each request. The examples below use `ZTURLSessionProvider.shared` from the Demo project provider implementations.
+>
+> Note: `send()` is part of `ZTAPICore`. Methods like `response()`, `responseDict()`, and `responseArr()` are provided via the Demo extension file `Demo/JsonDemo/Plugins/ZTAPI+Extension.swift` (copy and customize as needed).
 
 The simplest GET request:
 
@@ -810,10 +812,10 @@ public struct ZTAPIError: Error {
 | `retry(_:)`           | Set retry policy                         |
 | `uploadProgress(_:)`  | Set upload progress callback             |
 | `plugins(_:)`         | Add plugins                              |
-| `send()`              | Send request, return Data                |
-| `response()`          | Send request, return Codable object      |
-| `responseDict()`      | Send request, return [String: Any]       |
-| `responseArr()`       | Send request, return [[String: Any]]     |
+| `send()`              | Send request, return Data (`ZTAPICore`)  |
+| `response()`          | Send request, return Codable object (Demo extension) |
+| `responseDict()`      | Send request, return [String: Any] (Demo extension) |
+| `responseArr()`       | Send request, return [[String: Any]] (Demo extension) |
 | `parseResponse(_:)`   | Send request, XPath parsing (requires ZTJSON) |
 | `publisher()`         | Return Combine Publisher (requires extension) |
 

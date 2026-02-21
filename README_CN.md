@@ -129,6 +129,8 @@ pod 'ZTAPI', :git => 'https://github.com/willonboy/ZTAPI.git', :branch => 'main'
 ## 快速入门
 
 > 注意：`ZTAPI` 的每个请求都需要明确传入 `provider:`。下方示例使用的是 Demo 工程中的 `ZTURLSessionProvider.shared`。
+>
+> 注意：`send()` 属于 `ZTAPICore`。`response()`、`responseDict()`、`responseArr()` 由 Demo 扩展文件 `Demo/JsonDemo/Plugins/ZTAPI+Extension.swift` 提供（可直接复制并按需自定义）。
 
 最简单的 GET 请求：
 
@@ -810,10 +812,10 @@ public struct ZTAPIError: Error {
 | `retry(_:)`         | 设置重试策略                 |
 | `uploadProgress(_:)` | 设置上传进度回调             |
 | `plugins(_:)`       | 添加插件                     |
-| `send()`            | 发送请求，返回 Data          |
-| `response()`        | 发送请求，返回 Codable 对象  |
-| `responseDict()`    | 发送请求，返回 [String: Any] |
-| `responseArr()`     | 发送请求，返回 [[String: Any]] |
+| `send()`            | 发送请求，返回 Data（`ZTAPICore`） |
+| `response()`        | 发送请求，返回 Codable 对象（Demo 扩展） |
+| `responseDict()`    | 发送请求，返回 [String: Any]（Demo 扩展） |
+| `responseArr()`     | 发送请求，返回 [[String: Any]]（Demo 扩展） |
 | `parseResponse(_:)` | 发送请求，XPath 解析（需 ZTJSON） |
 | `publisher()`       | 返回 Combine Publisher（需扩展）|
 

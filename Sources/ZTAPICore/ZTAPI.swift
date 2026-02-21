@@ -21,7 +21,6 @@
 //
 
 import Foundation
-@preconcurrency import Combine
 
 private extension NSLock {
     func withLock<T>(_ body: () throws -> T) rethrows -> T {
@@ -67,7 +66,6 @@ public enum ZTAPIKVParam: ZTAPIParamProtocol {
 // MARK: - ZTAPI
 
 /// ZTAPI network request class
-/// Uses Codable protocol for response parsing, no third-party JSON library dependency
 public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
     private let stateLock = NSLock()
     private var _urlStr: String
@@ -337,14 +335,6 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             throw error
         }
     }
-    
-    /// Send request and return decoded Codable object
-    @discardableResult
-    public func response<T: Decodable>() async throws -> T {
-        let data = try await send()
-        return try JSONDecoder().decode(T.self, from: data)
-    }
-
 #if DEBUG
     deinit {
         print("dealloc", _urlStr)
