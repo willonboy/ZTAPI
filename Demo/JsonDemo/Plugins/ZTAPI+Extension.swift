@@ -91,3 +91,39 @@ public extension ZTAPI {
         .eraseToAnyPublisher()
     }
 }
+
+
+/// 适配post接口、同时需要携带query参数case
+public extension String {
+    func query(_ params: [String: Sendable]) -> String {
+        guard !params.isEmpty else { return self }
+
+        let separator = contains("?") ? "&" : "?"
+        let queryString = params.map { key, value in
+            let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
+            let encodedValue = "\(value)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "\(value)"
+            return "\(encodedKey)=\(encodedValue)"
+        }.joined(separator: "&")
+        
+        return self + separator + queryString
+    }
+}
+
+/// 适配post接口、同时需要携带query参数case
+public extension URL {
+    func query(_ params: [String: Sendable]) -> URL? {
+        guard !params.isEmpty else { return self }
+
+        guard var components = URLComponents(url: self, resolvingAgainstBaseURL: true) else {
+            return nil
+        }
+
+        var items = components.queryItems ?? []
+        for (key, value) in params {
+            items.append(URLQueryItem(name: key, value: "\(value)"))
+        }
+        components.queryItems = items
+
+        return components.url
+    }
+}

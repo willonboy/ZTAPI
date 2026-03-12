@@ -23,7 +23,7 @@
 import Foundation
 
 /// ZTAPI error type
-public struct ZTAPIError: CustomStringConvertible, Error, Equatable {
+public struct ZTAPIError: CustomStringConvertible, CustomDebugStringConvertible, Error, Equatable {
     public let code: Int
     public let msg: String
     /// Associated HTTP response (read-only, used for retry policy judgment)
@@ -39,11 +39,9 @@ public struct ZTAPIError: CustomStringConvertible, Error, Equatable {
         lhs.code == rhs.code
     }
     
-    public var description: String {
-        "ZTAPIError \(code): \(msg)"
-    }
-
-    public var localizedDescription: String { "\(msg)(\(code))" }
+    public var description: String { msg }
+    public var debugDescription: String { "ZTAPIError \(code): \(msg)" }
+    public var localizedDescription: String { msg }
 }
 
 // MARK: - Built-in Errors
