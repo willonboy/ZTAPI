@@ -63,6 +63,173 @@ public enum ZTAPIKVParam: ZTAPIParamProtocol {
     }
 }
 
+// MARK: - SSE Types
+
+/// SSE (Server-Sent Events) message
+public struct ZTSSEMessage: Sendable {
+    /// Event type (from "event:" field)
+    public let type: String
+    /// Message data (from "data:" field, may be multiple lines)
+    public let data: String
+    /// Message ID (from "id:" field)
+    public let id: String?
+    /// Retry interval in milliseconds (from "retry:" field)
+    public let retry: Int?
+
+    public init(type: String = "message", data: String, id: String? = nil, retry: Int? = nil) {
+        self.type = type
+        self.data = data
+        self.id = id
+        self.retry = retry
+    }
+}
+
+/// SSE connection state
+public enum ZTSSConnectionState: Sendable {
+    case connecting
+    case connected
+    case disconnected
+    case failed(Error)
+}
+
+// MARK: - WebSocket Types
+
+/// WebSocket message type
+public enum ZTWebSocketMessage: Sendable {
+    case text(String)
+    case data(Data)
+}
+
+/// WebSocket close code (RFC 6455)
+public struct ZTWebSocketCloseCode: RawRepresentable, Sendable {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    public static let normalClosure = ZTWebSocketCloseCode(rawValue: 1000)
+    public static let goingAway = ZTWebSocketCloseCode(rawValue: 1001)
+    public static let protocolError = ZTWebSocketCloseCode(rawValue: 1002)
+    public static let unsupportedData = ZTWebSocketCloseCode(rawValue: 1003)
+    public static let noStatus = ZTWebSocketCloseCode(rawValue: 1005)
+    public static let abnormalClosure = ZTWebSocketCloseCode(rawValue: 1006)
+    public static let invalidPayload = ZTWebSocketCloseCode(rawValue: 1007)
+    public static let policyViolation = ZTWebSocketCloseCode(rawValue: 1008)
+    public static let messageTooBig = ZTWebSocketCloseCode(rawValue: 1009)
+    public static let mandatoryExt = ZTWebSocketCloseCode(rawValue: 1010)
+    public static let internalError = ZTWebSocketCloseCode(rawValue: 1011)
+    public static let serviceRestart = ZTWebSocketCloseCode(rawValue: 1012)
+    public static let tryAgainLater = ZTWebSocketCloseCode(rawValue: 1013)
+    public static let tlsHandshake = ZTWebSocketCloseCode(rawValue: 1015)
+}
+
+/// WebSocket connection state
+public enum ZTWebSocketConnectionState: Sendable {
+    case connecting
+    case connected
+    case disconnected
+    case failed(Error)
+}
+
+/// WebSocket handle returned from connect, provides message stream and send methods
+public final class ZTWebSocketHandle: @unchecked Sendable {
+    private let webSocketTask: URLSessionWebSocketTask?
+    private let taskLock = NSLock()
+    private var _connectionState: ZTWebSocketConnectionState = .disconnected
+
+    public var connectionState: ZTWebSocketConnectionState {
+        taskLock.withLock { _connectionState }
+    }
+
+    init(webSocketTask: URLSessionWebSocketTask?) {
+        self.webSocketTask = webSocketTask
+    }
+
+    /// Send text message
+    public func send(_ text: String) async throws {
+        guard let task = webSocketTask else {
+            throw ZTAPIError.webSocketNotConnected
+        }
+        try await task.send(.string(text))
+    }
+
+    /// Send binary data
+    public func send(_ data: Data) async throws {
+        guard let task = webSocketTask else {
+            throw ZTAPIError.webSocketNotConnected
+        }
+        try await task.send(.data(data))
+    }
+
+    /// Send ping
+    public func sendPing() async throws {
+        guard let task = webSocketTask else {
+            throw ZTAPIError.webSocketNotConnected
+        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            task.sendPing { error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    /// Disconnect WebSocket
+    public func disconnect(code: ZTWebSocketCloseCode = .normalClosure, reason: String? = nil) {
+        guard let task = webSocketTask else { return }
+
+        taskLock.withLock {
+            _connectionState = .disconnected
+        }
+
+        task.cancel(with: .normalClosure, reason: reason?.data(using: .utf8))
+    }
+
+    /// Receive messages stream
+    public func receiveStream() -> AsyncStream<ZTWebSocketMessage> {
+        AsyncStream { [weak self] continuation in
+            guard let self = self, let task = self.webSocketTask else {
+                continuation.finish()
+                return
+            }
+
+            self.taskLock.withLock {
+                self._connectionState = .connected
+            }
+
+            Task {
+                while true {
+                    do {
+                        let message = try await task.receive()
+                        switch message {
+                        case .string(let text):
+                            continuation.yield(.text(text))
+                        case .data(let data):
+                            continuation.yield(.data(data))
+                        @unknown default:
+                            break
+                        }
+                    } catch {
+                        self.taskLock.withLock {
+                            self._connectionState = .failed(error)
+                        }
+                        break
+                    }
+                }
+                continuation.finish()
+            }
+
+            continuation.onTermination = { [weak self] _ in
+                self?.disconnect()
+            }
+        }
+    }
+}
+
 // MARK: - ZTAPI
 
 /// ZTAPI network request class
@@ -245,6 +412,38 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         return self
     }
 
+    // MARK: - Plugin Execution
+
+    /// Execute willSend plugins
+    private func _executeWillSendPlugins(_ plugins: [any ZTAPIPlugin], request: inout URLRequest) async throws {
+        for plugin in plugins {
+            try await plugin.willSend(&request)
+        }
+    }
+
+    /// Execute didReceive plugins
+    private func _executeDidReceivePlugins(_ plugins: [any ZTAPIPlugin], response: HTTPURLResponse, data: Data, request: URLRequest) async throws {
+        for plugin in plugins {
+            try await plugin.didReceive(response, data: data, request: request)
+        }
+    }
+
+    /// Execute process plugins
+    private func _executeProcessPlugins(_ plugins: [any ZTAPIPlugin], data: Data, response: HTTPURLResponse, request: URLRequest) async throws -> Data {
+        var processedData = data
+        for plugin in plugins {
+            processedData = try await plugin.process(processedData, response: response, request: request)
+        }
+        return processedData
+    }
+
+    /// Execute didCatch plugins
+    private func _executeDidCatchPlugins(_ plugins: [any ZTAPIPlugin], error: Error, request: URLRequest, response: HTTPURLResponse?, data: Data?) async throws {
+        for plugin in plugins {
+            try await plugin.didCatch(error, request: request, response: response, data: data)
+        }
+    }
+
     // MARK: - Send
 
     /// Send request and return raw Data
@@ -291,9 +490,7 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
         urlRequest.timeoutInterval = snapshot.requestTimeout ?? 60
 
         // Execute willSend plugins
-        for plugin in snapshot.plugins {
-            try await plugin.willSend(&urlRequest)
-        }
+        try await _executeWillSendPlugins(snapshot.plugins, request: &urlRequest)
 
         let effectiveProvider = if let policy = snapshot.requestRetryPolicy {
             ZTRetryProvider(baseProvider: provider, retryPolicy: policy)
@@ -312,15 +509,10 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             responseData = data
 
             // Execute didReceive plugins
-            for plugin in snapshot.plugins {
-                try await plugin.didReceive(response, data: data, request: urlRequest)
-            }
+            try await _executeDidReceivePlugins(snapshot.plugins, response: response, data: data, request: urlRequest)
 
             // Execute process plugins
-            var processedData = data
-            for plugin in snapshot.plugins {
-                processedData = try await plugin.process(processedData, response: response, request: urlRequest)
-            }
+            let processedData = try await _executeProcessPlugins(snapshot.plugins, data: data, response: response, request: urlRequest)
 
             return processedData
         } catch {
@@ -329,15 +521,197 @@ public class ZTAPI<P: ZTAPIParamProtocol>: @unchecked Sendable {
             if httpResponse == nil {
                 httpResponse = (error as? ZTAPIError)?.httpResponse
             }
-            for plugin in snapshot.plugins {
-                try await plugin.didCatch(error, request: urlRequest, response: httpResponse, data: responseData)
-            }
+            try await _executeDidCatchPlugins(snapshot.plugins, error: error, request: urlRequest, response: httpResponse, data: responseData)
             throw error
         }
     }
+
+    // MARK: - Send SSE
+
+    /// Send SSE request and return message stream
+    public func sendSSE() async throws -> AsyncStream<ZTSSEMessage> {
+        let snapshot = stateLock.withLock {
+            StateSnapshot(
+                urlStr: _urlStr,
+                method: _method,
+                params: _params,
+                headers: _headers,
+                bodyData: _bodyData,
+                encoding: _encoding,
+                plugins: _plugins,
+                requestTimeout: _requestTimeout,
+                requestRetryPolicy: nil,
+                uploadProgressHandler: nil
+            )
+        }
+
+        guard let url = URL(string: snapshot.urlStr) else {
+            throw ZTAPIError.invalidURL(snapshot.urlStr)
+        }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = snapshot.method.rawValue
+        // SSE requires Accept: text/event-stream
+        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+
+        for (key, value) in snapshot.headers {
+            urlRequest.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // Encode params
+        try snapshot.encoding.encode(&urlRequest, with: snapshot.params)
+
+        // Set timeout (default 24h for SSE)
+        urlRequest.timeoutInterval = snapshot.requestTimeout ?? 86400
+
+        // Execute willSend plugins
+        try await _executeWillSendPlugins(snapshot.plugins, request: &urlRequest)
+
+        let delegate = SSEDelegate()
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        let task = session.dataTask(with: urlRequest)
+
+        return AsyncStream { [weak self] continuation in
+            delegate.continuation = continuation
+            task.resume()
+
+            continuation.onTermination = { @Sendable [weak self] _ in
+                self?.stateLock.withLock {
+                    self?._requestTimeout = nil
+                }
+                session.invalidateAndCancel()
+            }
+        }
+    }
+
+    // MARK: - WebSocket Connect
+
+    /// Connect to WebSocket endpoint and return handle
+    public func connect() async throws -> ZTWebSocketHandle {
+        let snapshot = stateLock.withLock {
+            StateSnapshot(
+                urlStr: _urlStr,
+                method: _method,
+                params: _params,
+                headers: _headers,
+                bodyData: _bodyData,
+                encoding: _encoding,
+                plugins: _plugins,
+                requestTimeout: _requestTimeout,
+                requestRetryPolicy: nil,
+                uploadProgressHandler: nil
+            )
+        }
+
+        guard let url = URL(string: snapshot.urlStr) else {
+            throw ZTAPIError.invalidURL(snapshot.urlStr)
+        }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.timeoutInterval = snapshot.requestTimeout ?? 60
+
+        for (key, value) in snapshot.headers {
+            urlRequest.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // Execute willSend plugins
+        try await _executeWillSendPlugins(snapshot.plugins, request: &urlRequest)
+
+        let task = URLSession.shared.webSocketTask(with: urlRequest)
+        task.resume()
+        let handle = ZTWebSocketHandle(webSocketTask: task)
+
+        // Execute didReceive plugins on successful connection
+        let response = HTTPURLResponse(url: url, statusCode: 101, httpVersion: nil, headerFields: nil)!
+        try await _executeDidReceivePlugins(snapshot.plugins, response: response, data: Data(), request: urlRequest)
+
+        return handle
+    }
+
 #if DEBUG
     deinit {
         print("dealloc", _urlStr)
     }
 #endif
+}
+
+// MARK: - SSE Delegate
+
+private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    var continuation: AsyncStream<ZTSSEMessage>.Continuation?
+    private var buffer: String = ""
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard let chunk = String(data: data, encoding: .utf8) else { return }
+
+        buffer += chunk
+        processBuffer()
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            completionHandler(.cancel)
+            return
+        }
+
+        if httpResponse.mimeType != "text/event-stream" && httpResponse.mimeType != nil {
+            completionHandler(.cancel)
+            return
+        }
+
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        continuation?.finish()
+    }
+
+    private func processBuffer() {
+        guard let continuation = continuation else { return }
+
+        var lines = buffer.components(separatedBy: "\n")
+
+        // Keep the last incomplete line in buffer
+        if let last = lines.last, !last.isEmpty && !buffer.hasSuffix("\n") {
+            buffer = last
+            lines.removeLast()
+        } else {
+            buffer = ""
+        }
+
+        var messageData = ""
+        var messageType = "message"
+        var messageId: String?
+        var messageRetry: Int?
+
+        for line in lines {
+            if line.hasPrefix("event:") {
+                messageType = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("data:") {
+                let dataContent = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                if !messageData.isEmpty {
+                    messageData += "\n"
+                }
+                messageData += dataContent
+            } else if line.hasPrefix("id:") {
+                messageId = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("retry:") {
+                if let retryInt = Int(String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)) {
+                    messageRetry = retryInt
+                }
+            } else if line.isEmpty {
+                // Empty line means message complete
+                if !messageData.isEmpty {
+                    let message = ZTSSEMessage(type: messageType, data: messageData, id: messageId, retry: messageRetry)
+                    continuation.yield(message)
+                    // Reset for next message
+                    messageData = ""
+                    messageType = "message"
+                    messageId = nil
+                    messageRetry = nil
+                }
+            }
+        }
+    }
 }

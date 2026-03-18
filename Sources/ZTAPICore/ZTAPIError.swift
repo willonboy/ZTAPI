@@ -116,4 +116,9 @@ public extension ZTAPIError {
     static func fileReadFailed(_ path: String, _ message: String) -> ZTAPIError {
         ZTAPIError(80030001, "Failed to read file at \(path): \(message)")
     }
+
+    /// WebSocket related errors 80040000-80040999
+
+    /// WebSocket not connected
+    static var webSocketNotConnected: ZTAPIError { ZTAPIError(80040001, "WebSocket not connected") }
 }
