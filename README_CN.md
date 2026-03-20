@@ -504,6 +504,101 @@ let result = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/upload", .po
     .response()
 ```
 
+### 6. SSE（Server-Sent Events）
+
+SSE 用于接收服务器推送的实时消息流：
+
+```swift
+let stream = try await ZTAPI<ZTAPIKVParam>("https://api.example.com/events", .get, provider: ZTURLSessionProvider.shared)
+    .params(.kv("room", "chat"))
+    .headers(.h(key: "Authorization", value: "Bearer xxx"))
+    .plugins(logPlugin)
+    .sendSSE()
+
+for await message in stream {
+    print("事件类型: \(message.type)")
+    print("消息内容: \(message.data)")
+    print("消息ID: \(message.id ?? "无")")
+}
+```
+
+**ZTSSEMessage 结构：**
+
+| 字段 | 说明 |
+|------|------|
+| `type` | 事件类型（默认 "message"） |
+| `data` | 消息数据 |
+| `id` | 消息 ID（可选） |
+| `retry` | 重试间隔（毫秒，可选） |
+
+### 7. WebSocket
+
+WebSocket 用于双向实时通信：
+
+```swift
+// 建立连接
+let handle = try await ZTAPI<ZTAPIKVParam>("wss://api.example.com/ws", provider: ZTURLSessionProvider.shared)
+    .headers(.h(key: "Authorization", value: "Bearer xxx"))
+    .plugins(logPlugin)
+    .connect()
+
+// 接收消息
+for await message in handle.receiveStream() {
+    switch message {
+    case .text(let text):
+        print("收到文本: \(text)")
+    case .data(let data):
+        print("收到数据: \(data)")
+    }
+}
+
+// 发送消息
+try await handle.send("Hello")
+try await handle.send(Data([1, 2, 3]))
+
+// 断开连接
+handle.disconnect()
+```
+
+**ZTWebSocketMessage 类型：**
+
+```swift
+public enum ZTWebSocketMessage: Sendable {
+    case text(String)
+    case data(Data)
+}
+```
+
+**ZTWebSocketCloseCode（RFC 6455）：**
+
+| 关闭码 | 说明 |
+|--------|------|
+| `normalClosure` (1000) | 正常关闭 |
+| `goingAway` (1001) | 端点离开 |
+| `protocolError` (1002) | 协议错误 |
+| `unsupportedData` (1003) | 不支持的数据类型 |
+| `noStatus` (1005) | 无状态 |
+| `abnormalClosure` (1006) | 异常关闭 |
+| `invalidPayload` (1007) | 无效帧负载 |
+| `policyViolation` (1008) | 策略违规 |
+| `messageTooBig` (1009) | 消息过大 |
+| `mandatoryExt` (1010) | 强制扩展 |
+| `internalError` (1011) | 内部服务器错误 |
+| `serviceRestart` (1012) | 服务重启 |
+| `tryAgainLater` (1013) | 稍后重试 |
+| `tlsHandshake` (1015) | TLS 握手失败 |
+
+**ZTWebSocketConnectionState：**
+
+```swift
+public enum ZTWebSocketConnectionState: Sendable {
+    case connecting
+    case connected
+    case disconnected
+    case failed(Error)
+}
+```
+
 ---
 
 ## 高级特性
@@ -794,6 +889,7 @@ public struct ZTAPIError: Error {
 | `unsupportedPayloadType`| 80010005 | 不支持的载荷类型    |
 | `fileReadFailed`      | 80030001 | 文件读取失败        |
 | `xpathParseFailed`    | 80020001 | XPath 解析失败      |
+| `webSocketNotConnected` | 80040001 | WebSocket 未连接    |
 
 ---
 
@@ -813,6 +909,8 @@ public struct ZTAPIError: Error {
 | `uploadProgress(_:)` | 设置上传进度回调             |
 | `plugins(_:)`       | 添加插件                     |
 | `send()`            | 发送请求，返回 Data（`ZTAPICore`） |
+| `sendSSE()`         | 发送 SSE 请求，返回 AsyncStream（`ZTAPICore`） |
+| `connect()`         | 建立 WebSocket 连接，返回 ZTWebSocketHandle（`ZTAPICore`） |
 | `response()`        | 发送请求，返回 Codable 对象（Demo 扩展） |
 | `responseDict()`    | 发送请求，返回 [String: Any]（Demo 扩展） |
 | `responseArr()`     | 发送请求，返回 [[String: Any]]（Demo 扩展） |
